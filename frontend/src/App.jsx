@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, Link } from 'react-router-dom'
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   TrendingUp, Users, DollarSign, BarChart3,
   FileText, Building2, Menu, X, ChevronRight,
   MapPin, Lightbulb, ArrowRight, Target, Zap,
-  MessageCircle, Send, Bot, Sparkles
+  MessageCircle, Send, Bot, Sparkles, LogIn, LogOut, User
 } from 'lucide-react'
 import axios from 'axios'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, AreaChart, Area
@@ -45,6 +46,12 @@ const COST_OF_LIVING = {
 
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+  const { user, signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    await signOut()
+    setIsOpen(false)
+  }
 
   return (
     <nav className="bg-white/95 backdrop-blur-sm shadow-sm border-b border-gray-100 sticky top-0 z-50">
@@ -64,14 +71,24 @@ function Navbar() {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-1">
             <Link to="/dashboard" className="nav-link">Dashboard</Link>
-            <Link to="/compare" className="nav-link">Compare</Link>
             <Link to="/analytics" className="nav-link">Analytics</Link>
             <Link to="/negotiate" className="nav-link">Negotiate</Link>
             <Link to="/ai-advisor" className="nav-link flex items-center">
               <Sparkles className="w-4 h-4 mr-1" />
               AI Advisor
             </Link>
-            <Link to="/submit" className="btn-primary ml-4">Submit Data</Link>
+            <Link to="/submit" className="btn-primary ml-4">Compare</Link>
+            {user ? (
+              <button onClick={handleSignOut} className="ml-2 nav-link flex items-center text-red-500 hover:text-red-600">
+                <LogOut className="w-4 h-4 mr-1" />
+                Logout
+              </button>
+            ) : (
+              <Link to="/auth" className="ml-2 nav-link flex items-center">
+                <LogIn className="w-4 h-4 mr-1" />
+                Login
+              </Link>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -88,13 +105,21 @@ function Navbar() {
         <div className="md:hidden bg-white border-t animate-fadeIn">
           <div className="px-4 py-3 space-y-1">
             <Link to="/dashboard" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium">Dashboard</Link>
-            <Link to="/compare" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium">Compare</Link>
             <Link to="/analytics" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium">Analytics</Link>
             <Link to="/negotiate" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium">Negotiate</Link>
             <Link to="/ai-advisor" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium flex items-center">
               <Sparkles className="w-4 h-4 mr-2" />AI Advisor
             </Link>
-            <Link to="/submit" className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-semibold text-center mt-2">Submit Data</Link>
+            <Link to="/submit" className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-semibold text-center mt-2">Compare</Link>
+            {user ? (
+              <button onClick={handleSignOut} className="block w-full px-4 py-3 rounded-lg text-red-500 font-medium text-left flex items-center mt-2">
+                <LogOut className="w-4 h-4 mr-2" />Logout
+              </button>
+            ) : (
+              <Link to="/auth" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium flex items-center">
+                <LogIn className="w-4 h-4 mr-2" />Login / Register
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -129,12 +154,13 @@ function HomePage() {
               and negotiation tools to ensure you're paid what you're worth.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
-              <Link to="/compare" className="btn-primary text-lg px-8 py-4 inline-flex items-center justify-center">
-                Compare Your Salary
+              <Link to="/submit" className="btn-primary text-lg px-8 py-4 inline-flex items-center justify-center">
+                Compare Your Data
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
-              <Link to="/analytics" className="btn-secondary text-lg px-8 py-4 inline-flex items-center justify-center">
-                View Market Data
+              <Link to="/ai-advisor" className="btn-secondary text-lg px-8 py-4 inline-flex items-center justify-center">
+                <Sparkles className="w-5 h-5 mr-2" />
+                AI Advisor
               </Link>
             </div>
           </div>
@@ -193,6 +219,70 @@ function HomePage() {
         </div>
       </section>
 
+      {/* Market Data Section */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-flex items-center px-3 py-1 bg-secondary-100 text-secondary-700 rounded-full text-sm font-medium mb-4">
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Pay Gap Analytics
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold text-secondary-700 mb-6">
+                Explore Market Data
+              </h2>
+              <p className="text-lg text-secondary-500 mb-6 leading-relaxed">
+                Dive deep into salary analytics across industries, demographics, and locations.
+                Understand pay gaps, see how different factors affect compensation, and make
+                data-driven career decisions.
+              </p>
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-center text-secondary-600">
+                  <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                    <ChevronRight className="w-4 h-4 text-primary-600" />
+                  </div>
+                  Gender & ethnicity pay gap analysis
+                </li>
+                <li className="flex items-center text-secondary-600">
+                  <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                    <ChevronRight className="w-4 h-4 text-primary-600" />
+                  </div>
+                  Industry salary comparisons
+                </li>
+                <li className="flex items-center text-secondary-600">
+                  <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                    <ChevronRight className="w-4 h-4 text-primary-600" />
+                  </div>
+                  Location-based salary insights
+                </li>
+              </ul>
+              <Link to="/analytics" className="btn-secondary inline-flex items-center">
+                View Market Data
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="stat-card text-center">
+                <div className="text-4xl font-bold text-primary-600 mb-2">10+</div>
+                <p className="text-secondary-500 text-sm">Industries Tracked</p>
+              </div>
+              <div className="stat-card text-center">
+                <div className="text-4xl font-bold text-primary-600 mb-2">12+</div>
+                <p className="text-secondary-500 text-sm">Metro Areas</p>
+              </div>
+              <div className="stat-card text-center">
+                <div className="text-4xl font-bold text-primary-600 mb-2">500+</div>
+                <p className="text-secondary-500 text-sm">Data Points</p>
+              </div>
+              <div className="stat-card text-center">
+                <div className="text-4xl font-bold text-primary-600 mb-2">Live</div>
+                <p className="text-secondary-500 text-sm">Real-time Updates</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-20 bg-gradient-to-r from-secondary-600 via-secondary-500 to-primary-600">
         <div className="max-w-4xl mx-auto px-4 text-center">
@@ -202,7 +292,7 @@ function HomePage() {
           <p className="text-secondary-100 mb-10 text-lg max-w-2xl mx-auto">
             Join thousands using data to negotiate fair compensation and make informed career decisions.
           </p>
-          <Link to="/compare" className="bg-white text-secondary-600 font-semibold px-10 py-4 rounded-xl hover:bg-gray-50 transition-all duration-300 inline-flex items-center shadow-lg hover:shadow-xl">
+          <Link to="/submit" className="bg-white text-secondary-600 font-semibold px-10 py-4 rounded-xl hover:bg-gray-50 transition-all duration-300 inline-flex items-center shadow-lg hover:shadow-xl">
             Get Started Free <ChevronRight className="w-5 h-5 ml-2" />
           </Link>
         </div>
@@ -375,20 +465,53 @@ function InsightItem({ title, description, type }) {
 // =============================================================================
 
 function ComparePage() {
+  const location = useLocation()
+  const prefillData = location.state?.prefill
+
   const [form, setForm] = useState({
-    job_title: '',
-    industry: '',
-    years_experience: '',
-    salary: '',
-    location: ''
+    job_title: prefillData?.job_title || '',
+    industry: prefillData?.industry || '',
+    years_experience: prefillData?.years_experience || '',
+    salary: prefillData?.salary || '',
+    location: prefillData?.location || ''
   })
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [compareCity, setCompareCity] = useState('')
+  const [autoCompared, setAutoCompared] = useState(false)
 
   const industries = ['Technology', 'Healthcare', 'Finance', 'Education', 'Retail', 'Manufacturing', 'Consulting', 'Marketing', 'E-commerce', 'Nonprofit']
   const locations = Object.keys(COST_OF_LIVING)
+
+  // Auto-compare if coming from Submit page with prefilled data
+  useEffect(() => {
+    if (prefillData && !autoCompared && !result) {
+      setAutoCompared(true)
+      runComparison()
+    }
+  }, [prefillData, autoCompared])
+
+  const runComparison = async () => {
+    const formData = prefillData || form
+    if (!formData.job_title || !formData.industry || !formData.years_experience || !formData.salary || !formData.location) {
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const { data } = await api.post('/salary/compare', {
+        ...formData,
+        years_experience: parseInt(formData.years_experience),
+        salary: parseFloat(formData.salary)
+      })
+      setResult(data.comparison)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Comparison failed. We may not have enough data for your criteria.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -983,6 +1106,7 @@ function ScriptSection({ title, content, color }) {
 // =============================================================================
 
 function SubmitPage() {
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     job_title: '', industry: '', years_experience: '', salary: '', location: '',
     gender: '', ethnicity: '', education_level: '', company_size: '', remote_status: ''
@@ -1009,6 +1133,21 @@ function SubmitPage() {
     }
   }
 
+  const handleCompare = () => {
+    // Navigate to Compare page with submitted data pre-filled
+    navigate('/compare', {
+      state: {
+        prefill: {
+          job_title: form.job_title,
+          industry: form.industry,
+          years_experience: form.years_experience,
+          salary: form.salary,
+          location: form.location
+        }
+      }
+    })
+  }
+
   if (success) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 text-center">
@@ -1017,8 +1156,20 @@ function SubmitPage() {
             <TrendingUp className="w-10 h-10 text-green-600" />
           </div>
           <h2 className="text-2xl font-bold text-secondary-700 mb-3">Thank You!</h2>
-          <p className="text-secondary-500 mb-8">Your anonymous salary data helps everyone make better decisions.</p>
-          <Link to="/compare" className="btn-primary">Compare Your Salary</Link>
+          <p className="text-secondary-500 mb-4">Your anonymous salary data helps everyone make better decisions.</p>
+          <div className="bg-primary-50 rounded-xl p-4 mb-6 text-left">
+            <h3 className="font-semibold text-secondary-700 mb-2">Your Submission:</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div><span className="text-secondary-400">Role:</span> <span className="text-secondary-700">{form.job_title}</span></div>
+              <div><span className="text-secondary-400">Industry:</span> <span className="text-secondary-700">{form.industry}</span></div>
+              <div><span className="text-secondary-400">Experience:</span> <span className="text-secondary-700">{form.years_experience} years</span></div>
+              <div><span className="text-secondary-400">Salary:</span> <span className="text-secondary-700">${parseInt(form.salary).toLocaleString()}</span></div>
+              <div className="col-span-2"><span className="text-secondary-400">Location:</span> <span className="text-secondary-700">{form.location}</span></div>
+            </div>
+          </div>
+          <button onClick={handleCompare} className="btn-primary">
+            See How You Compare
+          </button>
         </div>
       </div>
     )
@@ -1366,10 +1517,141 @@ function AIAdvisorPage() {
 }
 
 // =============================================================================
+// AUTH PAGE
+// =============================================================================
+
+function AuthPage() {
+  const [isLogin, setIsLogin] = useState(true)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const { signIn, signUp, user } = useAuth()
+  const navigate = useNavigate()
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard')
+    }
+  }, [user, navigate])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    setMessage('')
+
+    try {
+      if (isLogin) {
+        const { error } = await signIn(email, password)
+        if (error) throw error
+        navigate('/dashboard')
+      } else {
+        const { error } = await signUp(email, password)
+        if (error) throw error
+        setMessage('Check your email for a confirmation link!')
+        setEmail('')
+        setPassword('')
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-[80vh] flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="card">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <User className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-secondary-700">
+              {isLogin ? 'Welcome Back' : 'Create Account'}
+            </h1>
+            <p className="text-secondary-400 mt-2">
+              {isLogin ? 'Sign in to access your dashboard' : 'Join CounterMarket today'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm mb-6 border border-red-100">
+              {error}
+            </div>
+          )}
+
+          {message && (
+            <div className="bg-green-50 text-green-600 p-4 rounded-xl text-sm mb-6 border border-green-100">
+              {message}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label className="label">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="input"
+                placeholder="you@example.com"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="label">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="input"
+                placeholder="Enter your password"
+                minLength={6}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full py-4"
+            >
+              {loading ? 'Please wait...' : (isLogin ? 'Sign In' : 'Create Account')}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setIsLogin(!isLogin)
+                setError('')
+                setMessage('')
+              }}
+              className="text-primary-600 hover:text-primary-700 font-medium"
+            >
+              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+            </button>
+          </div>
+        </div>
+
+        <p className="text-center text-secondary-400 text-sm mt-6">
+          By continuing, you agree to CounterMarket's Terms of Service
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
 // MAIN APP
 // =============================================================================
 
-export default function App() {
+function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -1381,6 +1663,7 @@ export default function App() {
         <Route path="/negotiate" element={<NegotiatePage />} />
         <Route path="/ai-advisor" element={<AIAdvisorPage />} />
         <Route path="/submit" element={<SubmitPage />} />
+        <Route path="/auth" element={<AuthPage />} />
       </Routes>
 
       {/* Footer */}
@@ -1401,5 +1684,13 @@ export default function App() {
         </div>
       </footer>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
