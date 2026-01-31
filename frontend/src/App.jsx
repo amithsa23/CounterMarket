@@ -3,7 +3,8 @@ import { Routes, Route, Link } from 'react-router-dom'
 import {
   TrendingUp, Users, DollarSign, BarChart3,
   FileText, Building2, Menu, X, ChevronRight,
-  MapPin, Lightbulb, ArrowRight, Target, Zap
+  MapPin, Lightbulb, ArrowRight, Target, Zap,
+  MessageCircle, Send, Bot, Sparkles
 } from 'lucide-react'
 import axios from 'axios'
 import {
@@ -66,6 +67,10 @@ function Navbar() {
             <Link to="/compare" className="nav-link">Compare</Link>
             <Link to="/analytics" className="nav-link">Analytics</Link>
             <Link to="/negotiate" className="nav-link">Negotiate</Link>
+            <Link to="/ai-advisor" className="nav-link flex items-center">
+              <Sparkles className="w-4 h-4 mr-1" />
+              AI Advisor
+            </Link>
             <Link to="/submit" className="btn-primary ml-4">Submit Data</Link>
           </div>
 
@@ -86,6 +91,9 @@ function Navbar() {
             <Link to="/compare" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium">Compare</Link>
             <Link to="/analytics" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium">Analytics</Link>
             <Link to="/negotiate" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium">Negotiate</Link>
+            <Link to="/ai-advisor" className="block px-4 py-3 rounded-lg hover:bg-primary-50 text-secondary-600 font-medium flex items-center">
+              <Sparkles className="w-4 h-4 mr-2" />AI Advisor
+            </Link>
             <Link to="/submit" className="block px-4 py-3 bg-primary-600 text-white rounded-lg font-semibold text-center mt-2">Submit Data</Link>
           </div>
         </div>
@@ -1109,6 +1117,255 @@ function SubmitPage() {
 }
 
 // =============================================================================
+// AI ADVISOR PAGE (Snowflake Cortex)
+// =============================================================================
+
+function AIAdvisorPage() {
+  const [messages, setMessages] = useState([
+    {
+      role: 'assistant',
+      content: "Hi! I'm your AI salary advisor powered by Snowflake Cortex. I can help you understand your market value and provide negotiation strategies. To get personalized advice, tell me about your role, salary, and what you'd like help with!"
+    }
+  ])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [userContext, setUserContext] = useState({
+    job_title: '',
+    salary: '',
+    industry: 'Technology',
+    location: 'San Francisco, CA',
+    percentile: 50,
+    median_salary: 120000
+  })
+  const [showContext, setShowContext] = useState(true)
+
+  const sendMessage = async (e) => {
+    e.preventDefault()
+    if (!input.trim() || loading) return
+
+    const userMessage = input.trim()
+    setInput('')
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setLoading(true)
+
+    try {
+      const { data } = await api.post('/chatbot/advice', {
+        message: userMessage,
+        job_title: userContext.job_title || 'professional',
+        salary: parseFloat(userContext.salary) || 100000,
+        industry: userContext.industry,
+        location: userContext.location,
+        percentile: userContext.percentile,
+        median_salary: userContext.median_salary
+      })
+
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.response,
+        model: data.model,
+        powered_by: data.powered_by
+      }])
+    } catch (err) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "I'm having trouble connecting right now. Please try again in a moment.",
+        error: true
+      }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const quickPrompts = [
+    "How do I ask for a raise?",
+    "What should I say in a salary negotiation?",
+    "Am I being paid fairly?",
+    "How do I research market rates?"
+  ]
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
+            <Bot className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-secondary-700">AI Salary Advisor</h1>
+            <p className="text-secondary-400 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary-500" />
+              Powered by Snowflake Cortex AI (Llama)
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Context Panel */}
+      {showContext && (
+        <div className="card mb-6 bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-100">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-secondary-700 flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary-500" />
+              Your Profile (for personalized advice)
+            </h3>
+            <button
+              onClick={() => setShowContext(false)}
+              className="text-secondary-400 hover:text-secondary-600 text-sm"
+            >
+              Hide
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="text-xs text-secondary-500 block mb-1">Job Title</label>
+              <input
+                type="text"
+                value={userContext.job_title}
+                onChange={e => setUserContext({...userContext, job_title: e.target.value})}
+                className="input text-sm py-2"
+                placeholder="Software Engineer"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-500 block mb-1">Current Salary</label>
+              <input
+                type="number"
+                value={userContext.salary}
+                onChange={e => setUserContext({...userContext, salary: e.target.value})}
+                className="input text-sm py-2"
+                placeholder="100000"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-secondary-500 block mb-1">Industry</label>
+              <select
+                value={userContext.industry}
+                onChange={e => setUserContext({...userContext, industry: e.target.value})}
+                className="select text-sm py-2"
+              >
+                {['Technology', 'Healthcare', 'Finance', 'Education', 'Retail', 'Consulting'].map(i => (
+                  <option key={i} value={i}>{i}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-secondary-500 block mb-1">Location</label>
+              <select
+                value={userContext.location}
+                onChange={e => setUserContext({...userContext, location: e.target.value})}
+                className="select text-sm py-2"
+              >
+                {Object.keys(COST_OF_LIVING).map(l => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!showContext && (
+        <button
+          onClick={() => setShowContext(true)}
+          className="text-primary-600 text-sm mb-4 hover:underline flex items-center gap-1"
+        >
+          <Target className="w-4 h-4" /> Show profile settings
+        </button>
+      )}
+
+      {/* Chat Container */}
+      <div className="card p-0 overflow-hidden">
+        {/* Messages */}
+        <div className="h-[400px] overflow-y-auto p-6 space-y-4">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] ${
+                msg.role === 'user'
+                  ? 'bg-primary-600 text-white rounded-2xl rounded-br-md'
+                  : 'bg-gray-100 text-secondary-700 rounded-2xl rounded-bl-md'
+              } px-4 py-3`}>
+                {msg.role === 'assistant' && (
+                  <div className="flex items-center gap-2 mb-2 text-xs text-secondary-400">
+                    <Bot className="w-4 h-4" />
+                    {msg.powered_by || 'AI Advisor'}
+                  </div>
+                )}
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
+                <div className="flex items-center gap-2 text-secondary-400">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></span>
+                    <span className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
+                    <span className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
+                  </div>
+                  <span className="text-sm">Thinking...</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Prompts */}
+        {messages.length <= 2 && (
+          <div className="px-6 pb-4">
+            <p className="text-xs text-secondary-400 mb-2">Quick questions:</p>
+            <div className="flex flex-wrap gap-2">
+              {quickPrompts.map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => setInput(prompt)}
+                  className="text-sm bg-primary-50 text-primary-700 px-3 py-1.5 rounded-full hover:bg-primary-100 transition-colors"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Input */}
+        <form onSubmit={sendMessage} className="border-t border-gray-100 p-4 bg-gray-50">
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="Ask about salary negotiation, market rates, or career advice..."
+              className="flex-1 input bg-white"
+              disabled={loading}
+            />
+            <button
+              type="submit"
+              disabled={loading || !input.trim()}
+              className="btn-primary px-6 flex items-center gap-2"
+            >
+              <Send className="w-4 h-4" />
+              Send
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Info Card */}
+      <div className="mt-6 p-4 bg-secondary-50 rounded-xl border border-secondary-100">
+        <div className="flex items-start gap-3">
+          <Lightbulb className="w-5 h-5 text-secondary-500 mt-0.5" />
+          <div className="text-sm text-secondary-600">
+            <p className="font-medium mb-1">About this AI</p>
+            <p>This advisor uses Snowflake Cortex AI with Llama to provide personalized salary negotiation advice based on market data. Your conversations are not stored.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
 // MAIN APP
 // =============================================================================
 
@@ -1122,6 +1379,7 @@ export default function App() {
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="/negotiate" element={<NegotiatePage />} />
+        <Route path="/ai-advisor" element={<AIAdvisorPage />} />
         <Route path="/submit" element={<SubmitPage />} />
       </Routes>
 
@@ -1136,7 +1394,7 @@ export default function App() {
               <span className="text-xl font-bold">CounterMarket</span>
             </div>
             <div className="text-secondary-300 text-sm text-center md:text-right">
-              <p>Built for Hack Violet 2026 | Powered by Snowflake</p>
+              <p>Built for Hack Violet 2026 | Powered by Snowflake + Cortex AI</p>
               <p className="mt-1">Making salary data transparent, one submission at a time.</p>
             </div>
           </div>

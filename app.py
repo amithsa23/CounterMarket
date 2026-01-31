@@ -548,6 +548,122 @@ def generate_negotiation_script():
     return jsonify({'script': script})
 
 # =============================================================================
+# CORTEX AI CHATBOT
+# =============================================================================
+
+@app.route('/api/chatbot/advice', methods=['POST'])
+def get_chatbot_advice():
+    """Generate salary negotiation advice using Snowflake Cortex AI with Llama."""
+    data = request.json
+
+    # Extract user context
+    job_title = data.get('job_title', 'professional')
+    salary = data.get('salary', 0)
+    percentile = data.get('percentile', 50)
+    industry = data.get('industry', 'technology')
+    location = data.get('location', '')
+    median_salary = data.get('median_salary', 0)
+    user_message = data.get('message', '')
+
+    # Build context-aware prompt
+    context = f"""You are a helpful salary negotiation advisor for CounterMarket, a pay equity platform.
+
+User's Profile:
+- Job Title: {job_title}
+- Current Salary: ${salary:,.0f}
+- Industry: {industry}
+- Location: {location}
+- Percentile Rank: {percentile}th percentile
+- Market Median: ${median_salary:,.0f}
+
+The user is asking: {user_message}
+
+Provide helpful, specific advice for their salary negotiation. Be encouraging but realistic.
+Keep your response concise (2-3 paragraphs max). Focus on actionable advice.
+If they're below median, suggest how to negotiate. If above, suggest how to maintain their position."""
+
+    try:
+        # Use Snowflake Cortex COMPLETE with Llama model
+        result = execute_query("""
+            SELECT SNOWFLAKE.CORTEX.COMPLETE(
+                'llama3.1-8b',
+                %s
+            ) as response
+        """, [context])
+
+        if result and result[0].get('response'):
+            response_text = result[0]['response']
+            # Clean up the response if needed
+            if isinstance(response_text, str):
+                response_text = response_text.strip()
+            return jsonify({
+                'response': response_text,
+                'model': 'llama3.1-8b',
+                'powered_by': 'Snowflake Cortex AI'
+            })
+        else:
+            return jsonify({
+                'response': get_fallback_advice(percentile, salary, median_salary),
+                'model': 'fallback',
+                'powered_by': 'CounterMarket'
+            })
+
+    except Exception as e:
+        print(f"Cortex AI error: {e}")
+        # Fallback to rule-based advice if Cortex fails
+        return jsonify({
+            'response': get_fallback_advice(percentile, salary, median_salary),
+            'model': 'fallback',
+            'error': str(e),
+            'powered_by': 'CounterMarket'
+        })
+
+def get_fallback_advice(percentile, salary, median_salary):
+    """Fallback advice when Cortex AI is unavailable."""
+    if percentile < 25:
+        gap = median_salary - salary
+        return f"""Your salary is in the bottom quartile, which suggests you have strong grounds for negotiation.
+
+Based on market data, you could potentially earn ${gap:,.0f} more to reach the median. I recommend:
+1. Document your key achievements and contributions
+2. Research comparable salaries at other companies
+3. Schedule a meeting with your manager to discuss your compensation
+4. Be prepared to discuss your value with specific examples
+
+Remember, the data is on your side - use it confidently!"""
+    elif percentile < 50:
+        gap = median_salary - salary
+        return f"""You're earning below the market median, which means there's room for improvement.
+
+The gap to median is about ${gap:,.0f}. Here's how to approach this:
+1. Prepare a list of your accomplishments from the past year
+2. Highlight any additional responsibilities you've taken on
+3. Frame your ask around your value, not just the market data
+4. Consider timing - performance reviews are ideal moments
+
+Stay positive and focus on your contributions!"""
+    elif percentile < 75:
+        return """Congratulations! You're earning above the market median, which is a strong position.
+
+To maintain and grow your compensation:
+1. Continue documenting your wins and impact
+2. Seek stretch opportunities that increase your visibility
+3. Build relationships with leadership
+4. Stay current on market trends in your field
+
+You're doing well - keep up the great work!"""
+    else:
+        return """Excellent! You're in the top quartile of earners for your role.
+
+To maintain this position:
+1. Focus on high-impact projects that demonstrate your value
+2. Consider mentoring others - it showcases leadership
+3. Stay visible to decision-makers
+4. Keep developing skills that are in high demand
+
+You've earned your position through strong performance. Continue to deliver results!"""
+
+# =============================================================================
 # DATA MANAGEMENT
 # =============================================================================
 
@@ -600,16 +716,17 @@ def health_check():
 def index():
     """Root endpoint."""
     return jsonify({
-        'name': 'WageWatch API',
+        'name': 'CounterMarket API',
         'version': '1.0.0',
-        'description': 'Pay Equity Analytics Platform',
+        'description': 'Pay Equity Analytics Platform with Cortex AI',
         'database': 'Snowflake',
+        'ai': 'Snowflake Cortex (Llama)',
         'hackathon': 'Hack Violet 2026'
     })
 
 if __name__ == '__main__':
     print(f"\n{'='*50}")
-    print("WageWatch API - Snowflake Powered")
+    print("CounterMarket API - Snowflake + Cortex AI")
     print("Hack Violet 2026")
     print(f"{'='*50}\n")
     app.run(debug=True, port=5000)
