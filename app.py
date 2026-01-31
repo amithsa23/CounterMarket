@@ -1,7 +1,13 @@
 """
-WageWatch: Pay Equity Analytics Platform
-Flask Backend with Snowflake Integration
+CounterMarket: Pay Equity Analytics Platform
+Flask Backend with Snowflake Integration + RAG-Powered AI
 Hack Violet 2026 - Snowflake API Category
+
+Features:
+- Snowflake Cortex AI (Llama 3.1-8b) for intelligent responses
+- RAG (Retrieval Augmented Generation) with vector embeddings
+- CORTEX.EMBED_TEXT_768 for semantic search
+- VECTOR_COSINE_SIMILARITY for document retrieval
 """
 
 import os
@@ -9,7 +15,6 @@ import random
 from datetime import datetime, timedelta
 import secrets
 import statistics
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -18,7 +23,7 @@ import snowflake.connector
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000", "http://localhost:5173"])
+CORS(app)  # Allow all origins for development
 
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
@@ -107,6 +112,19 @@ def init_snowflake_database():
 
     print("Tables created!")
 
+    # Create RAG knowledge base table
+    print("Creating RAG knowledge base table...")
+    execute_query("""
+        CREATE TABLE IF NOT EXISTS negotiation_knowledge (
+            id VARCHAR(64) PRIMARY KEY,
+            category VARCHAR(100) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+        )
+    """, fetch=False)
+    print("Knowledge base table created!")
+
     # Check if we need sample data
     count = execute_query("SELECT COUNT(*) as cnt FROM salary_submissions")
     if count and count[0]['cnt'] == 0:
@@ -115,137 +133,217 @@ def init_snowflake_database():
     else:
         print(f"Found {count[0]['cnt']} existing records")
 
+    # Initialize knowledge base
+    kb_count = execute_query("SELECT COUNT(*) as cnt FROM negotiation_knowledge")
+    if kb_count and kb_count[0]['cnt'] == 0:
+        print("Initializing RAG knowledge base...")
+        init_knowledge_base()
+    else:
+        print(f"Found {kb_count[0]['cnt']} knowledge base articles")
+
     print("Snowflake initialization complete!")
 
 def insert_snowflake_sample_data():
     """Insert realistic sample salary data into Snowflake based on 2024-2025 market rates."""
 
-    # Realistic base salaries by job title (entry-level baseline)
-    title_base_salaries = {
-        'Software Engineer': 95000,
-        'Senior Software Engineer': 145000,
-        'Data Analyst': 70000,
-        'Senior Data Analyst': 95000,
-        'Data Scientist': 110000,
-        'Product Manager': 120000,
-        'Senior Product Manager': 160000,
-        'Marketing Manager': 85000,
-        'Sales Representative': 60000,
-        'HR Manager': 75000,
-        'Financial Analyst': 75000,
-        'Project Manager': 85000,
-        'UX Designer': 85000,
-        'DevOps Engineer': 105000,
-        'Engineering Manager': 175000,
-    }
-
-    # Industry multipliers
-    industry_multipliers = {
-        'Technology': 1.15,
-        'Finance': 1.12,
-        'Healthcare': 1.0,
-        'Consulting': 1.08,
-        'E-commerce': 1.10,
-        'Education': 0.85,
-        'Retail': 0.88,
-        'Manufacturing': 0.95,
-        'Marketing': 0.95,
-        'Nonprofit': 0.80,
+    # Industry-specific job titles with realistic median salaries
+    # These are median salaries (not top-tier) for each role in that industry
+    industry_roles = {
+        'Technology': {
+            'Software Engineer': 105000,
+            'Senior Software Engineer': 145000,
+            'Data Analyst': 75000,
+            'Data Scientist': 115000,
+            'Product Manager': 125000,
+            'UX Designer': 95000,
+            'DevOps Engineer': 115000,
+            'Engineering Manager': 165000,
+            'Project Manager': 95000,
+        },
+        'Finance': {
+            'Financial Analyst': 85000,
+            'Senior Financial Analyst': 115000,
+            'Data Analyst': 80000,
+            'Software Engineer': 110000,
+            'Project Manager': 100000,
+            'Risk Analyst': 90000,
+            'Investment Analyst': 95000,
+            'Compliance Officer': 85000,
+        },
+        'Healthcare': {
+            'Data Analyst': 65000,
+            'Project Manager': 75000,
+            'HR Manager': 70000,
+            'Healthcare Administrator': 80000,
+            'Clinical Data Analyst': 72000,
+            'Marketing Manager': 75000,
+            'IT Specialist': 70000,
+            'Financial Analyst': 72000,
+        },
+        'Consulting': {
+            'Consultant': 85000,
+            'Senior Consultant': 115000,
+            'Data Analyst': 80000,
+            'Project Manager': 95000,
+            'Business Analyst': 82000,
+            'Strategy Analyst': 90000,
+            'Management Consultant': 105000,
+        },
+        'E-commerce': {
+            'Software Engineer': 100000,
+            'Product Manager': 115000,
+            'Data Analyst': 72000,
+            'UX Designer': 88000,
+            'Marketing Manager': 85000,
+            'Operations Manager': 78000,
+            'Supply Chain Analyst': 68000,
+        },
+        'Education': {
+            'Teacher': 52000,
+            'Administrator': 65000,
+            'Data Analyst': 55000,
+            'IT Specialist': 58000,
+            'HR Manager': 60000,
+            'Financial Analyst': 58000,
+            'Program Coordinator': 50000,
+            'Research Analyst': 55000,
+        },
+        'Retail': {
+            'Store Manager': 55000,
+            'District Manager': 75000,
+            'Marketing Manager': 68000,
+            'Data Analyst': 58000,
+            'HR Manager': 62000,
+            'Supply Chain Analyst': 60000,
+            'Buyer': 58000,
+            'Operations Manager': 65000,
+        },
+        'Manufacturing': {
+            'Operations Manager': 85000,
+            'Quality Engineer': 75000,
+            'Supply Chain Manager': 90000,
+            'Project Manager': 82000,
+            'Data Analyst': 65000,
+            'HR Manager': 70000,
+            'Financial Analyst': 72000,
+            'Production Manager': 78000,
+        },
+        'Marketing': {
+            'Marketing Manager': 82000,
+            'Digital Marketing Specialist': 62000,
+            'Content Strategist': 65000,
+            'Brand Manager': 85000,
+            'Data Analyst': 68000,
+            'Marketing Analyst': 65000,
+            'Creative Director': 105000,
+            'Social Media Manager': 55000,
+        },
+        'Nonprofit': {
+            'Program Manager': 58000,
+            'Development Director': 72000,
+            'Data Analyst': 52000,
+            'HR Manager': 55000,
+            'Marketing Manager': 55000,
+            'Grant Writer': 52000,
+            'Operations Manager': 60000,
+            'Finance Manager': 62000,
+        },
     }
 
     # Location multipliers (cost of living adjusted)
     location_multipliers = {
-        'San Francisco, CA': 1.45,
-        'New York, NY': 1.40,
-        'Seattle, WA': 1.30,
-        'Boston, MA': 1.25,
-        'Los Angeles, CA': 1.20,
-        'Austin, TX': 1.10,
-        'Denver, CO': 1.08,
-        'Chicago, IL': 1.05,
-        'Atlanta, GA': 1.0,
-        'Dallas, TX': 1.0,
-        'Phoenix, AZ': 0.95,
-        'Remote': 1.05,
+        'San Francisco, CA': 1.35,
+        'New York, NY': 1.30,
+        'Seattle, WA': 1.22,
+        'Boston, MA': 1.18,
+        'Los Angeles, CA': 1.15,
+        'Austin, TX': 1.05,
+        'Denver, CO': 1.03,
+        'Chicago, IL': 1.0,
+        'Atlanta, GA': 0.95,
+        'Dallas, TX': 0.95,
+        'Phoenix, AZ': 0.92,
+        'Remote': 1.0,
     }
 
     genders = ['Female', 'Male', 'Non-binary']
-    gender_weights = [0.35, 0.55, 0.10]  # Approximate tech industry breakdown
+    gender_weights = [0.40, 0.52, 0.08]
 
     ethnicities = ['Asian', 'Black/African American', 'Hispanic/Latino', 'White', 'Mixed/Multiple']
     education_levels = ['High School', 'Associate', 'Bachelor', 'Master', 'PhD']
-    education_weights = [0.05, 0.08, 0.50, 0.30, 0.07]
+    education_weights = [0.08, 0.10, 0.50, 0.27, 0.05]
 
     company_sizes = ['startup', 'small', 'medium', 'large', 'enterprise']
-    company_multipliers = {'startup': 0.90, 'small': 0.95, 'medium': 1.0, 'large': 1.08, 'enterprise': 1.15}
+    company_weights = [0.15, 0.20, 0.25, 0.25, 0.15]
+    company_multipliers = {'startup': 0.92, 'small': 0.96, 'medium': 1.0, 'large': 1.05, 'enterprise': 1.10}
 
     remote_statuses = ['remote', 'hybrid', 'onsite']
 
     conn = get_snowflake_connection()
     cursor = conn.cursor()
 
-    titles = list(title_base_salaries.keys())
-    industries = list(industry_multipliers.keys())
+    industries = list(industry_roles.keys())
     locations = list(location_multipliers.keys())
 
     for i in range(500):  # Generate 500 records for better statistics
         salary_id = secrets.token_hex(16)
-        title = random.choice(titles)
+
+        # Pick a random industry, then pick a role valid for that industry
         industry = random.choice(industries)
+        roles = industry_roles[industry]
+        title = random.choice(list(roles.keys()))
+
         location = random.choice(locations)
-        experience = random.randint(0, 20)
+        experience = random.randint(0, 15)
 
-        # Start with base salary for the role
-        base = title_base_salaries[title]
+        # Start with the median base salary for this role in this industry
+        base = roles[title]
 
-        # Experience scaling (realistic progression)
-        # Entry (0-2): 1.0x, Mid (3-5): 1.15-1.35x, Senior (6-10): 1.4-1.8x, Staff+ (11+): 1.8-2.5x
+        # Experience scaling (more realistic - diminishing returns)
+        # Entry (0-2): 0.85-1.0x, Mid (3-6): 1.0-1.20x, Senior (7-12): 1.15-1.40x, Staff+ (13+): 1.35-1.55x
         if experience <= 2:
-            exp_multiplier = 1.0 + (experience * 0.05)
-        elif experience <= 5:
-            exp_multiplier = 1.1 + ((experience - 2) * 0.08)
-        elif experience <= 10:
-            exp_multiplier = 1.35 + ((experience - 5) * 0.09)
+            exp_multiplier = 0.85 + (experience * 0.075)
+        elif experience <= 6:
+            exp_multiplier = 1.0 + ((experience - 2) * 0.05)
+        elif experience <= 12:
+            exp_multiplier = 1.20 + ((experience - 6) * 0.035)
         else:
-            exp_multiplier = 1.80 + ((experience - 10) * 0.07)
+            exp_multiplier = 1.40 + ((experience - 12) * 0.05)
 
         base = base * exp_multiplier
 
         # Apply location multiplier
         base = base * location_multipliers[location]
 
-        # Apply industry multiplier
-        base = base * industry_multipliers[industry]
-
         # Company size impact
-        size = random.choice(company_sizes)
+        size = random.choices(company_sizes, weights=company_weights)[0]
         base = base * company_multipliers[size]
 
-        # Education bonus
+        # Education bonus (smaller impact)
         edu = random.choices(education_levels, weights=education_weights)[0]
-        edu_bonus = {'High School': 0.90, 'Associate': 0.95, 'Bachelor': 1.0, 'Master': 1.08, 'PhD': 1.12}
+        edu_bonus = {'High School': 0.92, 'Associate': 0.96, 'Bachelor': 1.0, 'Master': 1.05, 'PhD': 1.08}
         base = base * edu_bonus[edu]
 
-        # Add some random variance (±10%)
-        base = base * random.uniform(0.90, 1.10)
+        # Add some random variance (±8%)
+        base = base * random.uniform(0.92, 1.08)
 
         # Gender selection with documented pay gaps
         gender = random.choices(genders, weights=gender_weights)[0]
         if gender == 'Female':
-            base = base * 0.85  # 15% pay gap (women earn 85 cents per dollar)
+            base = base * 0.87  # 13% pay gap
         elif gender == 'Non-binary':
-            base = base * 0.90  # 10% pay gap
+            base = base * 0.91  # 9% pay gap
 
         # Ethnicity with documented pay gaps
         ethnicity = random.choice(ethnicities)
-        ethnicity_multipliers = {
+        ethnicity_gaps = {
             'Asian': 1.0,
             'White': 1.0,
-            'Mixed/Multiple': 0.95,
-            'Black/African American': 0.92,
-            'Hispanic/Latino': 0.88,
+            'Mixed/Multiple': 0.96,
+            'Black/African American': 0.93,
+            'Hispanic/Latino': 0.90,
         }
-        base = base * ethnicity_multipliers[ethnicity]
+        base = base * ethnicity_gaps[ethnicity]
 
         # Round to nearest thousand for realism
         final_salary = round(base / 1000) * 1000
@@ -265,6 +363,116 @@ def insert_snowflake_sample_data():
     conn.commit()
     conn.close()
     print(f"Inserted 500 realistic sample salary records!")
+
+# =============================================================================
+# RAG KNOWLEDGE BASE
+# =============================================================================
+
+def init_knowledge_base():
+    """Initialize the RAG knowledge base with salary negotiation articles."""
+
+    knowledge_articles = [
+        {
+            "category": "negotiation_basics",
+            "title": "How to Start a Salary Negotiation",
+            "content": """Starting a salary negotiation requires preparation and confidence. First, research market rates for your role using sites like Glassdoor, LinkedIn Salary, and Levels.fyi. Know your worth before entering any discussion. Schedule a dedicated meeting with your manager - don't ambush them. Open with gratitude for the opportunity, then present your case with specific achievements and market data. Use phrases like 'Based on my research and contributions, I'd like to discuss adjusting my compensation to align with market rates.' Always have a specific number in mind, and aim slightly higher than your target to leave room for negotiation."""
+        },
+        {
+            "category": "negotiation_tactics",
+            "title": "Proven Negotiation Tactics That Work",
+            "content": """Effective negotiation tactics include: 1) Anchoring - state your desired salary first to set the reference point. 2) Silence - after making your ask, stay quiet and let them respond. 3) The Flinch - show mild surprise at low offers to signal it's below expectations. 4) Never accept the first offer - there's almost always room for improvement. 5) Get it in writing - verbal promises mean nothing without documentation. 6) Consider the total package - salary, bonus, equity, PTO, remote work, and benefits all have value. 7) Have alternatives - knowing you have other options gives you leverage and confidence."""
+        },
+        {
+            "category": "pay_equity",
+            "title": "Understanding Pay Gaps and Your Rights",
+            "content": """Pay gaps exist across gender, race, and other demographics. Women earn approximately 82 cents for every dollar men earn. The gap is wider for women of color - Black women earn 63 cents and Latina women earn 57 cents per dollar compared to white men. Know your rights: many states now have pay transparency laws requiring salary ranges in job postings. Some states prohibit asking about salary history. You can ask HR about your company's pay equity practices and whether they conduct regular pay audits. If you suspect discrimination, document everything and consider consulting with an employment attorney or filing a complaint with the EEOC."""
+        },
+        {
+            "category": "market_research",
+            "title": "How to Research Your Market Value",
+            "content": """To determine your market value, use multiple sources: Glassdoor and LinkedIn Salary provide self-reported data. Levels.fyi is excellent for tech roles. The Bureau of Labor Statistics has official government data. Talk to recruiters - they know current market rates. Network with peers in similar roles. Consider factors that affect pay: location (SF pays 40% more than average), company size (enterprise pays 15% more than startups), industry (tech and finance pay premiums), years of experience, and specialized skills. Create a salary range with low, mid, and high points based on your research."""
+        },
+        {
+            "category": "timing",
+            "title": "Best Times to Ask for a Raise",
+            "content": """Timing matters for salary negotiations. Best times: 1) During annual performance reviews - companies expect these discussions. 2) After completing a major project successfully. 3) When taking on new responsibilities. 4) After receiving a competing job offer (use carefully). 5) When the company is doing well financially. 6) 3-6 months after a promotion if salary didn't increase proportionally. Avoid asking during layoffs, budget cuts, right after starting, or during your manager's stressful periods. If told 'not now,' ask when would be appropriate and get a specific timeline."""
+        },
+        {
+            "category": "scripts",
+            "title": "What to Say When Negotiating Salary",
+            "content": """Key phrases for negotiation: 'Based on my research of market rates and my contributions to the team, I believe a salary of $X would be appropriate.' 'I'm excited about this opportunity. To make this work, I'd need the compensation to be in the range of $X-$Y.' 'Thank you for the offer. I was expecting something closer to $X based on my experience and the market rate for this role.' If they say no: 'I understand budget constraints. What would it take for me to reach $X in the next 6-12 months?' or 'If base salary is fixed, are there other components we could discuss like signing bonus, equity, or additional PTO?'"""
+        },
+        {
+            "category": "remote_work",
+            "title": "Negotiating Salary for Remote Positions",
+            "content": """Remote work adds complexity to salary negotiations. Some companies pay based on location (geo-adjusted), while others pay the same regardless of where you live. If relocating from a high-cost area, negotiate to keep your current salary or accept a smaller adjustment than proposed. Highlight that remote workers often have higher productivity and lower overhead costs for the company. If the company insists on location-based pay, negotiate for other benefits: home office stipend, coworking space allowance, or annual travel budget for team meetings. Remote work itself has value - factor this into your total compensation calculation."""
+        },
+        {
+            "category": "new_job",
+            "title": "Negotiating Salary for a New Job Offer",
+            "content": """New job offers are your best opportunity to negotiate. Never accept immediately - always ask for time to consider. Research the company's pay practices and typical ranges. Start negotiations after receiving a written offer, not during interviews. Focus on the total package: base salary, signing bonus, annual bonus, equity/RSUs, PTO, 401k match, and other benefits. If the base is firm, push for a signing bonus or accelerated review. Get everything in writing before accepting. It's okay to negotiate multiple rounds - employers expect it. The worst they can say is no, and offers are rarely rescinded for reasonable negotiations."""
+        },
+        {
+            "category": "promotion",
+            "title": "Getting Paid Fairly After a Promotion",
+            "content": """Promotions should come with significant pay increases, typically 10-20%. If offered less, negotiate before accepting the new title. Research what the new role pays in the market - your raise should bring you to at least the market median for the new level. Document your expanded responsibilities and how they differ from your current role. If the raise is below expectations, ask: 'This promotion comes with significantly more responsibility. Based on market data for this role, I expected the compensation to be closer to $X. Can we discuss bridging that gap?' Consider negotiating a timeline for an additional raise after proving yourself in the new role."""
+        },
+        {
+            "category": "confidence",
+            "title": "Building Confidence for Salary Discussions",
+            "content": """Confidence in negotiation comes from preparation. Know your worth by researching thoroughly. Write down your achievements and practice articulating them. Role-play the conversation with a friend or mentor. Remember that negotiating is expected and professional - you won't lose an offer for asking professionally. Reframe nervousness as excitement. Use power poses before important meetings. Focus on facts and data rather than emotions. It's not personal - it's business. Companies have budgets for negotiations and often start low expecting pushback. You're advocating for your value, which is a professional skill, not a character flaw. The more you negotiate, the easier it becomes."""
+        }
+    ]
+
+    conn = get_snowflake_connection()
+    cursor = conn.cursor()
+
+    for article in knowledge_articles:
+        article_id = secrets.token_hex(16)
+        cursor.execute("""
+            INSERT INTO negotiation_knowledge (id, category, title, content)
+            VALUES (%s, %s, %s, %s)
+        """, [article_id, article['category'], article['title'], article['content']])
+
+    conn.commit()
+    conn.close()
+    print(f"Inserted {len(knowledge_articles)} knowledge base articles!")
+
+
+def retrieve_relevant_context(user_question, top_k=3):
+    """
+    RAG: Retrieve relevant documents using Snowflake Cortex embeddings.
+    Uses EMBED_TEXT_768 for semantic search and VECTOR_COSINE_SIMILARITY for matching.
+    """
+    try:
+        # Use Snowflake Cortex to find semantically similar documents
+        results = execute_query("""
+            WITH question_embedding AS (
+                SELECT SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', %s) as embedding
+            )
+            SELECT
+                nk.title,
+                nk.category,
+                nk.content,
+                VECTOR_COSINE_SIMILARITY(
+                    SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', nk.content),
+                    qe.embedding
+                ) as similarity_score
+            FROM negotiation_knowledge nk, question_embedding qe
+            ORDER BY similarity_score DESC
+            LIMIT %s
+        """, [user_question, top_k])
+
+        if results:
+            context_parts = []
+            for doc in results:
+                context_parts.append(f"**{doc['title']}**\n{doc['content']}")
+            return "\n\n---\n\n".join(context_parts)
+        return ""
+    except Exception as e:
+        print(f"RAG retrieval error: {e}")
+        return ""
+
 
 # Initialize on startup
 try:
@@ -517,7 +725,7 @@ def get_location_comparison():
 
 @app.route('/api/negotiation/script', methods=['POST'])
 def generate_negotiation_script():
-    """Generate a personalized salary negotiation script."""
+    """Generate a personalized salary negotiation script with real market data."""
     data = request.json
     required = ['current_salary', 'target_salary', 'job_title', 'achievements']
     if not all(k in data for k in required):
@@ -526,26 +734,219 @@ def generate_negotiation_script():
     current = float(data['current_salary'])
     target = float(data['target_salary'])
     increase_pct = ((target - current) / current) * 100
+    industry = data.get('industry', 'Technology')
+    location = data.get('location', '')
+
+    # Fetch real market data from Snowflake
+    market_data = get_negotiation_market_data(industry, location)
 
     achievements_list = [a for a in data.get('achievements', []) if a and a.strip()]
     achievements_text = "; ".join(achievements_list[:5]) if achievements_list else "my consistent high performance"
 
+    # Calculate percentile position
+    percentile = calculate_percentile_position(current, market_data)
+    target_percentile = calculate_percentile_position(target, market_data)
+
+    # Build data-driven market data section
+    market_data_text = build_market_data_script(current, target, market_data, industry, location, percentile)
+
+    # Build data-driven ask with specific numbers
+    ask_text = build_ask_script(current, target, increase_pct, market_data, target_percentile)
+
     script = {
-        'opening': f"Thank you for meeting with me. I wanted to discuss my compensation as a {data['job_title']}. Based on my research and contributions, I believe an adjustment is warranted.",
-        'market_data': f"According to market data, the median salary for my role and experience level is ${target:,.0f}. My current salary of ${current:,.0f} is below this benchmark.",
+        'opening': f"Thank you for meeting with me. I wanted to discuss my compensation as a {data['job_title']}. Based on my research and contributions over the past year, I believe an adjustment is warranted.",
+        'market_data': market_data_text,
         'achievements': f"My key contributions include: {achievements_text}",
-        'ask': f"I am requesting a salary adjustment to ${target:,.0f}, which represents a {increase_pct:.1f}% increase and aligns with market rates.",
-        'closing': "I am committed to continuing to deliver strong results and would appreciate your consideration of this request.",
+        'ask': ask_text,
+        'closing': "I am committed to continuing to deliver strong results and would appreciate your consideration of this request. I'm open to discussing how we can make this work.",
         'tips': [
-            "Practice your script beforehand",
-            "Maintain confident but respectful tone",
-            "Be prepared to discuss specific achievements",
-            "Have a backup ask (e.g., additional PTO, flexible work)",
-            "Get any agreement in writing"
-        ]
+            f"Your current salary is at the {percentile}th percentile - use this as leverage",
+            "Practice your script until it feels natural",
+            "Maintain confident but collaborative tone",
+            f"If they counter, don't go below ${market_data['median']:,.0f} (the market median)",
+            "Have a backup ask ready (signing bonus, extra PTO, remote flexibility)",
+            "Get any agreement in writing within 48 hours"
+        ],
+        # Include raw data for frontend display
+        'data_points': {
+            'your_salary': current,
+            'target_salary': target,
+            'your_percentile': percentile,
+            'target_percentile': target_percentile,
+            'market_median': market_data['median'],
+            'market_p25': market_data['p25'],
+            'market_p75': market_data['p75'],
+            'market_p90': market_data['p90'],
+            'sample_size': market_data['sample_size'],
+            'industry': industry,
+            'location': location,
+            'increase_percent': round(increase_pct, 1),
+            'increase_amount': target - current,
+            'gap_to_median': market_data['median'] - current,
+            'gap_to_median_percent': round(((market_data['median'] - current) / current) * 100, 1) if current > 0 else 0
+        }
     }
 
     return jsonify({'script': script})
+
+
+def get_negotiation_market_data(industry, location):
+    """Fetch real market data from Snowflake for negotiation context."""
+    try:
+        # Query for industry + location specific data
+        query = """
+            SELECT
+                COUNT(*) as sample_size,
+                ROUND(AVG(salary), 0) as avg_salary,
+                ROUND(MEDIAN(salary), 0) as median_salary,
+                ROUND(PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY salary), 0) as p25,
+                ROUND(PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY salary), 0) as p75,
+                ROUND(PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY salary), 0) as p90,
+                ROUND(MIN(salary), 0) as min_salary,
+                ROUND(MAX(salary), 0) as max_salary
+            FROM salary_submissions
+            WHERE industry = %s
+        """
+        params = [industry]
+
+        if location:
+            query += " AND location = %s"
+            params.append(location)
+
+        results = execute_query(query, params)
+
+        if results and results[0]['sample_size'] >= 5:
+            return {
+                'sample_size': results[0]['sample_size'],
+                'avg': results[0]['avg_salary'],
+                'median': results[0]['median_salary'],
+                'p25': results[0]['p25'],
+                'p75': results[0]['p75'],
+                'p90': results[0]['p90'],
+                'min': results[0]['min_salary'],
+                'max': results[0]['max_salary']
+            }
+
+        # Fallback to industry-only data if location-specific is too small
+        if location:
+            return get_negotiation_market_data(industry, None)
+
+        # Fallback to all data
+        results = execute_query("""
+            SELECT
+                COUNT(*) as sample_size,
+                ROUND(AVG(salary), 0) as avg_salary,
+                ROUND(MEDIAN(salary), 0) as median_salary,
+                ROUND(PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY salary), 0) as p25,
+                ROUND(PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY salary), 0) as p75,
+                ROUND(PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY salary), 0) as p90
+            FROM salary_submissions
+        """)
+
+        if results:
+            return {
+                'sample_size': results[0]['sample_size'],
+                'avg': results[0]['avg_salary'],
+                'median': results[0]['median_salary'],
+                'p25': results[0]['p25'],
+                'p75': results[0]['p75'],
+                'p90': results[0]['p90'],
+                'min': results[0].get('min_salary', results[0]['p25']),
+                'max': results[0].get('max_salary', results[0]['p90'])
+            }
+
+    except Exception as e:
+        print(f"Error fetching market data: {e}")
+
+    # Return defaults if all else fails
+    return {
+        'sample_size': 100,
+        'avg': 95000,
+        'median': 90000,
+        'p25': 70000,
+        'p75': 115000,
+        'p90': 140000,
+        'min': 50000,
+        'max': 200000
+    }
+
+
+def calculate_percentile_position(salary, market_data):
+    """Calculate which percentile a salary falls into."""
+    if salary <= market_data['p25']:
+        # Interpolate between 0-25
+        pct = (salary / market_data['p25']) * 25 if market_data['p25'] > 0 else 10
+        return max(1, min(25, int(pct)))
+    elif salary <= market_data['median']:
+        # Interpolate between 25-50
+        range_size = market_data['median'] - market_data['p25']
+        position = salary - market_data['p25']
+        pct = 25 + (position / range_size * 25) if range_size > 0 else 37
+        return int(pct)
+    elif salary <= market_data['p75']:
+        # Interpolate between 50-75
+        range_size = market_data['p75'] - market_data['median']
+        position = salary - market_data['median']
+        pct = 50 + (position / range_size * 25) if range_size > 0 else 62
+        return int(pct)
+    elif salary <= market_data['p90']:
+        # Interpolate between 75-90
+        range_size = market_data['p90'] - market_data['p75']
+        position = salary - market_data['p75']
+        pct = 75 + (position / range_size * 15) if range_size > 0 else 82
+        return int(pct)
+    else:
+        # Above P90
+        return min(99, 90 + int((salary - market_data['p90']) / market_data['p90'] * 10))
+
+
+def build_market_data_script(current, target, market_data, industry, location, percentile):
+    """Build a data-driven market data section for the negotiation script."""
+    location_text = f" in {location}" if location else ""
+
+    if percentile < 25:
+        position_text = f"significantly below market rate (bottom 25%)"
+        urgency = "This represents a meaningful gap that I'd like to address."
+    elif percentile < 50:
+        position_text = f"below the market median"
+        urgency = "Bringing my compensation to median would reflect my market value."
+    elif percentile < 75:
+        position_text = f"around the market median"
+        urgency = "Given my contributions, I believe I should be compensated in the upper quartile."
+    else:
+        position_text = f"in the upper range"
+        urgency = "I'd like to ensure my compensation continues to reflect my performance."
+
+    script = (
+        f"I've researched compensation data for {industry} professionals{location_text}. "
+        f"Based on {market_data['sample_size']} data points, the market median is ${market_data['median']:,.0f}, "
+        f"with the 75th percentile at ${market_data['p75']:,.0f} and the 90th percentile at ${market_data['p90']:,.0f}. "
+        f"My current salary of ${current:,.0f} places me at the {percentile}th percentile, which is {position_text}. "
+        f"{urgency}"
+    )
+
+    return script
+
+
+def build_ask_script(current, target, increase_pct, market_data, target_percentile):
+    """Build a data-driven ask section for the negotiation script."""
+    if target <= market_data['median']:
+        justification = f"This would bring me to the market median, which is a fair baseline for my experience."
+    elif target <= market_data['p75']:
+        justification = f"This would place me at the {target_percentile}th percentile, reflecting my above-average contributions."
+    elif target <= market_data['p90']:
+        justification = f"This would position me at the {target_percentile}th percentile, appropriate for a high performer."
+    else:
+        justification = f"This reflects top-tier compensation for exceptional contributors in this field."
+
+    script = (
+        f"I am requesting a salary adjustment to ${target:,.0f}, "
+        f"which represents a {increase_pct:.1f}% increase (${target - current:,.0f}). "
+        f"{justification} "
+        f"This is well within the market range of ${market_data['p25']:,.0f} to ${market_data['p90']:,.0f}."
+    )
+
+    return script
 
 # =============================================================================
 # CORTEX AI CHATBOT
@@ -553,7 +954,14 @@ def generate_negotiation_script():
 
 @app.route('/api/chatbot/advice', methods=['POST'])
 def get_chatbot_advice():
-    """Generate salary negotiation advice using Snowflake Cortex AI with Llama."""
+    """
+    Generate salary negotiation advice using Snowflake Cortex AI with RAG.
+
+    This endpoint demonstrates three Snowflake Cortex AI features:
+    1. EMBED_TEXT_768 - Creates embeddings for semantic search
+    2. VECTOR_COSINE_SIMILARITY - Finds similar documents
+    3. COMPLETE - Generates responses with Llama 3.1
+    """
     data = request.json
 
     # Extract user context
@@ -565,10 +973,23 @@ def get_chatbot_advice():
     median_salary = data.get('median_salary', 0)
     user_message = data.get('message', '')
 
-    # Build context-aware prompt
-    context = f"""You are a helpful salary negotiation advisor for CounterMarket, a pay equity platform.
+    # RAG: Retrieve relevant knowledge base articles
+    retrieved_context = retrieve_relevant_context(user_message, top_k=3)
 
-User's Profile:
+    # Build context-aware prompt with RAG context
+    rag_section = ""
+    if retrieved_context:
+        rag_section = f"""
+RELEVANT KNOWLEDGE BASE ARTICLES:
+{retrieved_context}
+
+Use the above articles to inform your response when relevant.
+
+"""
+
+    prompt = f"""You are a helpful salary negotiation advisor for CounterMarket, a pay equity platform.
+{rag_section}
+USER'S PROFILE:
 - Job Title: {job_title}
 - Current Salary: ${salary:,.0f}
 - Industry: {industry}
@@ -576,11 +997,16 @@ User's Profile:
 - Percentile Rank: {percentile}th percentile
 - Market Median: ${median_salary:,.0f}
 
-The user is asking: {user_message}
+USER'S QUESTION: {user_message}
 
-Provide helpful, specific advice for their salary negotiation. Be encouraging but realistic.
-Keep your response concise (2-3 paragraphs max). Focus on actionable advice.
-If they're below median, suggest how to negotiate. If above, suggest how to maintain their position."""
+INSTRUCTIONS:
+- Provide helpful, specific advice for their salary negotiation
+- Reference the knowledge base articles when applicable
+- Be encouraging but realistic
+- Keep your response concise (2-3 paragraphs max)
+- Focus on actionable advice
+- If they're below median, suggest how to negotiate
+- If above, suggest how to maintain their position"""
 
     try:
         # Use Snowflake Cortex COMPLETE with Llama model
@@ -589,7 +1015,7 @@ If they're below median, suggest how to negotiate. If above, suggest how to main
                 'llama3.1-8b',
                 %s
             ) as response
-        """, [context])
+        """, [prompt])
 
         if result and result[0].get('response'):
             response_text = result[0]['response']
@@ -599,12 +1025,14 @@ If they're below median, suggest how to negotiate. If above, suggest how to main
             return jsonify({
                 'response': response_text,
                 'model': 'llama3.1-8b',
-                'powered_by': 'Snowflake Cortex AI'
+                'rag_enabled': bool(retrieved_context),
+                'powered_by': 'Snowflake Cortex AI + RAG'
             })
         else:
             return jsonify({
                 'response': get_fallback_advice(percentile, salary, median_salary),
                 'model': 'fallback',
+                'rag_enabled': False,
                 'powered_by': 'CounterMarket'
             })
 
@@ -614,6 +1042,7 @@ If they're below median, suggest how to negotiate. If above, suggest how to main
         return jsonify({
             'response': get_fallback_advice(percentile, salary, median_salary),
             'model': 'fallback',
+            'rag_enabled': False,
             'error': str(e),
             'powered_by': 'CounterMarket'
         })
@@ -717,11 +1146,16 @@ def index():
     """Root endpoint."""
     return jsonify({
         'name': 'CounterMarket API',
-        'version': '1.0.0',
-        'description': 'Pay Equity Analytics Platform with Cortex AI',
+        'version': '2.0.0',
+        'description': 'Pay Equity Analytics Platform with RAG-Powered AI',
         'database': 'Snowflake',
-        'ai': 'Snowflake Cortex (Llama)',
-        'hackathon': 'Hack Violet 2026'
+        'ai_features': {
+            'llm': 'Snowflake Cortex COMPLETE (Llama 3.1-8b)',
+            'embeddings': 'Snowflake Cortex EMBED_TEXT_768 (e5-base-v2)',
+            'similarity': 'VECTOR_COSINE_SIMILARITY',
+            'rag': 'Retrieval Augmented Generation with knowledge base'
+        },
+        'hackathon': 'Hack Violet 2026 - Best Use of Snowflake API'
     })
 
 if __name__ == '__main__':
@@ -729,4 +1163,4 @@ if __name__ == '__main__':
     print("CounterMarket API - Snowflake + Cortex AI")
     print("Hack Violet 2026")
     print(f"{'='*50}\n")
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)

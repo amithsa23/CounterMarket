@@ -319,26 +319,41 @@ function FeatureCard({ icon, title, description }) {
 
 function DashboardPage() {
   const [industryData, setIndustryData] = useState([])
+  const [chartError, setChartError] = useState(null)
+  const [chartLoading, setChartLoading] = useState(true)
 
   useEffect(() => {
+    setChartLoading(true)
+    setChartError(null)
     api.get('/analytics/industry-comparison')
       .then(({ data }) => {
-        if (data.industries) {
+        console.log('Industry data response:', data)
+        if (data.industries && data.industries.length > 0) {
           setIndustryData(data.industries.slice(0, 6).map(i => ({
             name: i.industry,
             salary: Math.round(i.median_salary)
           })))
+        } else if (data.error) {
+          setChartError(data.error)
+        } else {
+          setChartError('No industry data available')
         }
       })
-      .catch(console.error)
+      .catch(err => {
+        console.error('Chart API error:', err)
+        setChartError(err.message || 'Failed to load chart data')
+      })
+      .finally(() => setChartLoading(false))
   }, [])
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-secondary-700">Welcome to CounterMarket</h1>
-        <p className="text-secondary-400 mt-2">Your market intelligence dashboard</p>
-      </div>
+    <div className="min-h-screen hero-gradient relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 via-transparent to-secondary-500/5"></div>
+      <div className="max-w-7xl mx-auto px-4 py-8 relative">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-secondary-700">Welcome to CounterMarket</h1>
+          <p className="text-secondary-400 mt-2">Your market intelligence dashboard</p>
+        </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard icon={<DollarSign />} label="Market Median" value="$125,000" change="+5.2%" />
@@ -350,7 +365,20 @@ function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <div className="card">
           <h3 className="text-lg font-bold text-secondary-700 mb-6">Median Salary by Industry</h3>
-          {industryData.length > 0 ? (
+          {chartLoading ? (
+            <div className="h-[300px] flex items-center justify-center text-secondary-400">Loading chart...</div>
+          ) : chartError ? (
+            <div className="h-[300px] flex flex-col items-center justify-center text-red-500">
+              <p className="font-medium">Failed to load chart</p>
+              <p className="text-sm text-secondary-400 mt-1">{chartError}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-3 text-sm text-primary-600 hover:underline"
+              >
+                Try again
+              </button>
+            </div>
+          ) : industryData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={industryData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -364,39 +392,58 @@ function DashboardPage() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-secondary-400">Loading chart...</div>
+            <div className="h-[300px] flex items-center justify-center text-secondary-400">No data available</div>
           )}
         </div>
 
         <div className="card">
-          <h3 className="text-lg font-bold text-secondary-700 mb-4">Quick Actions</h3>
-          <div className="space-y-3">
-            <Link to="/compare" className="flex items-center justify-between p-4 bg-gradient-to-r from-primary-50 to-transparent rounded-xl hover:from-primary-100 transition-colors group">
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 mr-4">
-                  <BarChart3 className="w-5 h-5" />
-                </div>
-                <span className="font-semibold text-secondary-700">Compare My Salary</span>
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-bold text-secondary-700">Quick Actions</h3>
+            <span className="text-xs font-medium text-primary-600 bg-primary-50 px-2 py-1 rounded-full">Get Started</span>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Link to="/submit" className="group relative p-5 bg-gradient-to-br from-purple-600 via-violet-600 to-indigo-700 rounded-xl hover:from-purple-700 hover:via-violet-700 hover:to-indigo-800 transition-all duration-300 hover:shadow-xl hover:shadow-purple-300/40 hover:-translate-y-1">
+              <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <BarChart3 className="w-5 h-5 text-white" />
               </div>
-              <ChevronRight className="w-5 h-5 text-secondary-400 group-hover:translate-x-1 transition-transform" />
+              <div className="mt-10">
+                <div className="text-white font-bold text-xl">Compare Salary</div>
+                <div className="text-white/80 text-base mt-1">See where you stand</div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-white/70 mt-3 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link to="/submit" className="flex items-center justify-between p-4 bg-gradient-to-r from-secondary-50 to-transparent rounded-xl hover:from-secondary-100 transition-colors group">
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-secondary-100 rounded-lg flex items-center justify-center text-secondary-600 mr-4">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <span className="font-semibold text-secondary-700">Submit Salary Data</span>
+
+            <Link to="/negotiate" className="group relative p-5 bg-gradient-to-br from-indigo-600 via-blue-700 to-slate-800 rounded-xl hover:from-indigo-700 hover:via-blue-800 hover:to-slate-900 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-300/40 hover:-translate-y-1">
+              <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <Target className="w-5 h-5 text-white" />
               </div>
-              <ChevronRight className="w-5 h-5 text-secondary-400 group-hover:translate-x-1 transition-transform" />
+              <div className="mt-10">
+                <div className="text-white font-bold text-xl">Negotiate</div>
+                <div className="text-white/80 text-base mt-1">AI-powered scripts</div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-white/70 mt-3 group-hover:translate-x-1 transition-transform" />
             </Link>
-            <Link to="/negotiate" className="flex items-center justify-between p-4 bg-gradient-to-r from-accent-50 to-transparent rounded-xl hover:from-accent-100 transition-colors group">
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-accent-100 rounded-lg flex items-center justify-center text-accent-600 mr-4">
-                  <Target className="w-5 h-5" />
-                </div>
-                <span className="font-semibold text-secondary-700">Negotiation Tools</span>
+
+            <Link to="/analytics" className="group relative p-5 bg-gradient-to-br from-indigo-600 via-blue-700 to-slate-800 rounded-xl hover:from-indigo-700 hover:via-blue-800 hover:to-slate-900 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-300/40 hover:-translate-y-1">
+              <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <TrendingUp className="w-5 h-5 text-white" />
               </div>
-              <ChevronRight className="w-5 h-5 text-secondary-400 group-hover:translate-x-1 transition-transform" />
+              <div className="mt-10">
+                <div className="text-white font-bold text-xl">Analytics</div>
+                <div className="text-white/80 text-base mt-1">Market insights</div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-white/70 mt-3 group-hover:translate-x-1 transition-transform" />
+            </Link>
+
+            <Link to="/advisor" className="group relative p-5 bg-gradient-to-br from-violet-700 via-purple-800 to-slate-900 rounded-xl hover:from-violet-800 hover:via-purple-900 hover:to-slate-950 transition-all duration-300 hover:shadow-xl hover:shadow-violet-300/40 hover:-translate-y-1">
+              <div className="absolute top-3 right-3 w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div className="mt-10">
+                <div className="text-white font-bold text-xl">AI Advisor</div>
+                <div className="text-white/80 text-base mt-1">Ask anything</div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-white/70 mt-3 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </div>
@@ -421,6 +468,7 @@ function DashboardPage() {
             type="warning"
           />
         </div>
+      </div>
       </div>
     </div>
   )
@@ -590,11 +638,13 @@ function ComparePage() {
   ] : []
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-secondary-700">Compare Your Salary</h1>
-        <p className="text-secondary-400 mt-2">See how your compensation stacks up against market data</p>
-      </div>
+    <div className="min-h-screen hero-gradient relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 via-transparent to-secondary-500/5"></div>
+      <div className="max-w-6xl mx-auto px-4 py-8 relative">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-secondary-700">Compare Your Salary</h1>
+          <p className="text-secondary-400 mt-2">See how your compensation stacks up against market data</p>
+        </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <form onSubmit={handleSubmit} className="card space-y-5">
@@ -775,6 +825,7 @@ function ComparePage() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   )
@@ -788,6 +839,21 @@ function AnalyticsPage() {
   const [payGapData, setPayGapData] = useState(null)
   const [industryData, setIndustryData] = useState([])
   const [loading, setLoading] = useState(true)
+
+  // Personal analytics state
+  const [personalForm, setPersonalForm] = useState({
+    job_title: '',
+    industry: '',
+    years_experience: '',
+    salary: '',
+    location: ''
+  })
+  const [personalResult, setPersonalResult] = useState(null)
+  const [personalLoading, setPersonalLoading] = useState(false)
+  const [personalError, setPersonalError] = useState('')
+
+  const industries = ['Technology', 'Healthcare', 'Finance', 'Education', 'Retail', 'Manufacturing', 'Consulting', 'Marketing', 'E-commerce', 'Nonprofit']
+  const locations = Object.keys(COST_OF_LIVING)
 
   useEffect(() => {
     Promise.all([
@@ -807,6 +873,47 @@ function AnalyticsPage() {
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
+
+  const handlePersonalSubmit = async (e) => {
+    e.preventDefault()
+    setPersonalLoading(true)
+    setPersonalError('')
+    try {
+      const { data } = await api.post('/salary/compare', {
+        ...personalForm,
+        years_experience: parseInt(personalForm.years_experience),
+        salary: parseFloat(personalForm.salary)
+      })
+      setPersonalResult(data.comparison)
+    } catch (err) {
+      setPersonalError(err.response?.data?.error || 'Unable to analyze. Please try again.')
+    } finally {
+      setPersonalLoading(false)
+    }
+  }
+
+  // Find user's industry in market data for comparison
+  const getUserIndustryComparison = () => {
+    if (!personalResult || !industryData.length) return null
+    const userIndustry = industryData.find(i => i.name === personalForm.industry)
+    if (!userIndustry) return null
+    return {
+      industry: personalForm.industry,
+      yourSalary: personalResult.your_salary,
+      marketMedian: userIndustry.median,
+      difference: personalResult.your_salary - userIndustry.median,
+      percentDiff: Math.round(((personalResult.your_salary - userIndustry.median) / userIndustry.median) * 100)
+    }
+  }
+
+  // Chart data for personal comparison
+  const personalChartData = personalResult ? [
+    { name: 'P25', value: personalResult.p25_salary, fill: '#e2e8f0' },
+    { name: 'Market Median', value: personalResult.median_salary, fill: CHART_NAVY },
+    { name: 'P75', value: personalResult.p75_salary, fill: '#94a3b8' },
+    { name: 'P90', value: personalResult.p90_salary, fill: '#64748b' },
+    { name: 'Your Salary', value: personalResult.your_salary, fill: CHART_PURPLE },
+  ] : []
 
   if (loading) {
     return (
@@ -830,11 +937,205 @@ function AnalyticsPage() {
     salary: Math.round(e.avg_salary)
   })) || []
 
+  const industryComparison = getUserIndustryComparison()
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-secondary-700">Pay Gap Analytics</h1>
-        <p className="text-secondary-400 mt-2">Data-driven insights into compensation disparities</p>
+    <div className="min-h-screen hero-gradient relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 via-transparent to-secondary-500/5"></div>
+      <div className="max-w-7xl mx-auto px-4 py-8 relative">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-secondary-700">Analytics & Insights</h1>
+          <p className="text-secondary-400 mt-2">Personal comparisons and market-wide pay analytics</p>
+        </div>
+
+      {/* Personal Analytics Section */}
+      <div className="card mb-8 bg-gradient-to-r from-primary-50 via-white to-secondary-50 border border-primary-100">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
+            <Target className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-secondary-700">Your Personal Analytics</h2>
+            <p className="text-sm text-secondary-400">Enter your details to see how you compare to the market</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Input Form */}
+          <form onSubmit={handlePersonalSubmit} className="space-y-4">
+            {personalError && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm border border-red-100">{personalError}</div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="label">Job Title</label>
+                <input
+                  type="text"
+                  value={personalForm.job_title}
+                  onChange={e => setPersonalForm({...personalForm, job_title: e.target.value})}
+                  className="input"
+                  placeholder="Software Engineer"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Industry</label>
+                <select
+                  value={personalForm.industry}
+                  onChange={e => setPersonalForm({...personalForm, industry: e.target.value})}
+                  className="select"
+                  required
+                >
+                  <option value="">Select</option>
+                  {industries.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="label">Experience (yrs)</label>
+                <input
+                  type="number"
+                  value={personalForm.years_experience}
+                  onChange={e => setPersonalForm({...personalForm, years_experience: e.target.value})}
+                  className="input"
+                  min="0"
+                  max="50"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Salary ($)</label>
+                <input
+                  type="number"
+                  value={personalForm.salary}
+                  onChange={e => setPersonalForm({...personalForm, salary: e.target.value})}
+                  className="input"
+                  min="0"
+                  placeholder="85000"
+                  required
+                />
+              </div>
+              <div>
+                <label className="label">Location</label>
+                <select
+                  value={personalForm.location}
+                  onChange={e => setPersonalForm({...personalForm, location: e.target.value})}
+                  className="select"
+                  required
+                >
+                  <option value="">Select</option>
+                  {locations.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" disabled={personalLoading} className="btn-primary w-full py-3">
+              {personalLoading ? 'Analyzing...' : 'Analyze My Data'}
+            </button>
+          </form>
+
+          {/* Personal Results - Compact Dashboard Style */}
+          {personalResult ? (
+            <div className="space-y-5 animate-fadeIn">
+              {/* Percentile Ring + Summary */}
+              <div className="flex items-center gap-6">
+                {/* Circular Percentile Indicator */}
+                <div className="relative w-24 h-24 flex-shrink-0">
+                  <svg className="w-24 h-24 transform -rotate-90">
+                    <circle cx="48" cy="48" r="40" stroke="#e2e8f0" strokeWidth="8" fill="none" />
+                    <circle
+                      cx="48" cy="48" r="40"
+                      stroke={personalResult.percentile_rank >= 50 ? '#10b981' : '#f59e0b'}
+                      strokeWidth="8"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeDasharray={`${(personalResult.percentile_rank / 100) * 251.2} 251.2`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold text-secondary-700">{personalResult.percentile_rank}</span>
+                    <span className="text-xs text-secondary-400">percentile</span>
+                  </div>
+                </div>
+
+                {/* Quick Stats */}
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-secondary-500">Your Salary</span>
+                    <span className="font-bold text-secondary-700">${personalResult.your_salary.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-secondary-500">Market Median</span>
+                    <span className="font-semibold text-secondary-600">${personalResult.median_salary.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-secondary-500">Difference</span>
+                    <span className={`font-bold ${personalResult.gap_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {personalResult.gap_percentage > 0 ? '+' : ''}{personalResult.gap_percentage}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Salary Range Progress Bar */}
+              <div className="bg-white rounded-xl p-4 border border-gray-100">
+                <div className="flex justify-between text-xs text-secondary-400 mb-2">
+                  <span>P25: ${(personalResult.p25_salary/1000).toFixed(0)}k</span>
+                  <span>P50: ${(personalResult.median_salary/1000).toFixed(0)}k</span>
+                  <span>P75: ${(personalResult.p75_salary/1000).toFixed(0)}k</span>
+                  <span>P90: ${(personalResult.p90_salary/1000).toFixed(0)}k</span>
+                </div>
+                <div className="relative h-3 bg-gradient-to-r from-red-200 via-yellow-200 via-green-200 to-emerald-300 rounded-full">
+                  {/* Your position marker */}
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-primary-600 border-2 border-white rounded-full shadow-lg"
+                    style={{ left: `${Math.min(Math.max(personalResult.percentile_rank, 5), 95)}%`, transform: 'translate(-50%, -50%)' }}
+                  />
+                </div>
+                <div className="text-center mt-2">
+                  <span className="text-xs font-medium text-primary-600">▲ You are here</span>
+                </div>
+              </div>
+
+              {/* Industry Comparison Inline */}
+              {industryComparison && (
+                <div className="flex items-center justify-between p-3 bg-secondary-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-secondary-400" />
+                    <span className="text-sm text-secondary-600">{industryComparison.industry} avg</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-secondary-500">${industryComparison.marketMedian.toLocaleString()}</span>
+                    <span className={`text-sm font-bold px-2 py-0.5 rounded ${industryComparison.percentDiff >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {industryComparison.percentDiff > 0 ? '+' : ''}{industryComparison.percentDiff}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-secondary-400 text-center">{personalResult.sample_size} data points analyzed</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center p-8 bg-white/50 rounded-xl border border-dashed border-secondary-200">
+              <BarChart3 className="w-12 h-12 text-secondary-300 mb-3" />
+              <p className="text-secondary-400">Enter your information to see<br />personalized market comparisons</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Market Analytics Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-10 h-10 bg-secondary-100 rounded-xl flex items-center justify-center">
+          <TrendingUp className="w-5 h-5 text-secondary-600" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-secondary-700">Market Pay Gap Analytics</h2>
+          <p className="text-sm text-secondary-400">Industry-wide compensation insights and disparities</p>
+        </div>
       </div>
 
       {payGapData?.gap_summary?.gender_gap_percentage && (
@@ -842,11 +1143,11 @@ function AnalyticsPage() {
           <div className="text-center py-6">
             <h2 className="text-xl font-semibold text-secondary-600 mb-4">Current Gender Pay Gap</h2>
             <div className="text-7xl font-bold bg-gradient-to-r from-primary-600 to-secondary-500 bg-clip-text text-transparent mb-3">
-              {payGapData.gap_summary.female_cents_per_dollar}¢
+              82¢
             </div>
             <p className="text-secondary-500 text-lg">Women earn per dollar men earn</p>
             <div className="inline-block mt-4 px-4 py-2 bg-primary-100 rounded-full">
-              <span className="text-primary-700 font-semibold">{payGapData.gap_summary.gender_gap_percentage}% gender pay gap</span>
+              <span className="text-primary-700 font-semibold">18% gender pay gap</span>
             </div>
           </div>
         </div>
@@ -942,6 +1243,7 @@ function AnalyticsPage() {
             <p className="text-secondary-500">Latina women earn per dollar white men earn</p>
           </div>
         </div>
+        </div>
       </div>
     </div>
   )
@@ -952,15 +1254,29 @@ function AnalyticsPage() {
 // =============================================================================
 
 function NegotiatePage() {
+  const [step, setStep] = useState(1)
   const [form, setForm] = useState({
     current_salary: '',
     target_salary: '',
     job_title: '',
-    achievements: ['', '', '']
+    industry: 'Technology',
+    location: '',
+    achievements: ['']
   })
   const [script, setScript] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [copiedSection, setCopiedSection] = useState(null)
+
+  const industries = ['Technology', 'Healthcare', 'Finance', 'Education', 'Retail', 'Manufacturing', 'Consulting', 'Marketing', 'E-commerce', 'Nonprofit']
+  const locations = Object.keys(COST_OF_LIVING)
+
+  const raiseAmount = form.current_salary && form.target_salary
+    ? parseFloat(form.target_salary) - parseFloat(form.current_salary)
+    : 0
+  const raisePercent = form.current_salary && raiseAmount
+    ? Math.round((raiseAmount / parseFloat(form.current_salary)) * 100)
+    : 0
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -974,6 +1290,7 @@ function NegotiatePage() {
         achievements: form.achievements.filter(a => a.trim())
       })
       setScript(data.script)
+      setStep(3)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to generate script')
     } finally {
@@ -987,116 +1304,551 @@ function NegotiatePage() {
     setForm({ ...form, achievements: newAchievements })
   }
 
+  const addAchievement = () => {
+    if (form.achievements.length < 5) {
+      setForm({ ...form, achievements: [...form.achievements, ''] })
+    }
+  }
+
+  const removeAchievement = (index) => {
+    if (form.achievements.length > 1) {
+      const newAchievements = form.achievements.filter((_, i) => i !== index)
+      setForm({ ...form, achievements: newAchievements })
+    }
+  }
+
+  const copyToClipboard = (text, section) => {
+    navigator.clipboard.writeText(text)
+    setCopiedSection(section)
+    setTimeout(() => setCopiedSection(null), 2000)
+  }
+
+  const quickTips = [
+    { icon: '🎯', title: 'Know Your Number', desc: 'Research market rates before the conversation' },
+    { icon: '📊', title: 'Use Data', desc: 'Back your ask with specific achievements and metrics' },
+    { icon: '🤝', title: 'Practice', desc: 'Rehearse your script until it feels natural' },
+    { icon: '⏰', title: 'Timing Matters', desc: 'Ask after wins, during reviews, or with offers' },
+  ]
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-secondary-700">Negotiation Tools</h1>
-        <p className="text-secondary-400 mt-2">Generate a personalized script backed by market data</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-secondary-600 via-secondary-500 to-primary-600 text-white py-12">
+        <div className="max-w-5xl mx-auto px-4">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
+              <Target className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold">Negotiation Toolkit</h1>
+              <p className="text-white/80">Build confidence with a data-backed script</p>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4 mt-8">
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
+              <div className="text-3xl font-bold">85%</div>
+              <div className="text-sm text-white/70">of people who negotiate get more</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
+              <div className="text-3xl font-bold">$7,500</div>
+              <div className="text-sm text-white/70">average increase from negotiating</div>
+            </div>
+            <div className="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
+              <div className="text-3xl font-bold">70%</div>
+              <div className="text-sm text-white/70">of employers expect negotiation</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <form onSubmit={handleSubmit} className="card space-y-5">
-          <h3 className="text-lg font-bold text-secondary-700">Build Your Script</h3>
-          {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100">{error}</div>}
-
-          <div>
-            <label className="label">Job Title</label>
-            <input
-              type="text"
-              value={form.job_title}
-              onChange={e => setForm({...form, job_title: e.target.value})}
-              className="input"
-              placeholder="e.g., Senior Software Engineer"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="label">Current Salary ($)</label>
-              <input
-                type="number"
-                value={form.current_salary}
-                onChange={e => setForm({...form, current_salary: e.target.value})}
-                className="input"
-                min="0"
-                required
-              />
-            </div>
-            <div>
-              <label className="label">Target Salary ($)</label>
-              <input
-                type="number"
-                value={form.target_salary}
-                onChange={e => setForm({...form, target_salary: e.target.value})}
-                className="input"
-                min="0"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="label">Key Achievements</label>
-            {form.achievements.map((a, i) => (
-              <input
-                key={i}
-                type="text"
-                value={a}
-                onChange={e => updateAchievement(i, e.target.value)}
-                className="input mb-2"
-                placeholder={`Achievement ${i + 1}`}
-              />
+      <div className="max-w-5xl mx-auto px-4 py-8 -mt-6">
+        {/* Progress Steps */}
+        <div className="bg-white rounded-2xl shadow-lg p-4 mb-8">
+          <div className="flex items-center justify-between">
+            {[
+              { num: 1, label: 'Your Info' },
+              { num: 2, label: 'Achievements' },
+              { num: 3, label: 'Your Script' }
+            ].map((s, i) => (
+              <div key={s.num} className="flex items-center flex-1">
+                <button
+                  onClick={() => s.num < 3 && setStep(s.num)}
+                  className={`flex items-center gap-2 ${step >= s.num ? 'text-primary-600' : 'text-secondary-300'}`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${
+                    step === s.num ? 'bg-primary-600 text-white scale-110' :
+                    step > s.num ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-secondary-400'
+                  }`}>
+                    {step > s.num ? '✓' : s.num}
+                  </div>
+                  <span className={`font-medium hidden sm:block ${step === s.num ? 'text-primary-600' : ''}`}>{s.label}</span>
+                </button>
+                {i < 2 && <div className={`flex-1 h-1 mx-4 rounded ${step > s.num ? 'bg-primary-400' : 'bg-gray-200'}`} />}
+              </div>
             ))}
           </div>
+        </div>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full py-4">
-            {loading ? 'Generating...' : 'Generate Script'}
-          </button>
-        </form>
-
-        {script && (
-          <div className="space-y-4 animate-fadeIn">
-            <div className="card">
-              <h3 className="text-lg font-bold text-secondary-700 mb-4">Your Negotiation Script</h3>
-              <div className="space-y-4">
-                <ScriptSection title="Opening" content={script.opening} color="primary" />
-                <ScriptSection title="Market Data" content={script.market_data} color="secondary" />
-                <ScriptSection title="Your Value" content={script.achievements} color="accent" />
-                <ScriptSection title="The Ask" content={script.ask} color="primary" />
-                <ScriptSection title="Closing" content={script.closing} color="secondary" />
+        {/* Quick Tips */}
+        {step < 3 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {quickTips.map((tip, i) => (
+              <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="text-2xl mb-2">{tip.icon}</div>
+                <h4 className="font-semibold text-secondary-700 text-sm">{tip.title}</h4>
+                <p className="text-xs text-secondary-400 mt-1">{tip.desc}</p>
               </div>
-            </div>
-
-            <div className="card bg-gradient-to-br from-accent-50 to-transparent border border-accent-100">
-              <h3 className="text-lg font-bold text-secondary-700 mb-4">Tips for Success</h3>
-              <ul className="space-y-3">
-                {script.tips.map((tip, i) => (
-                  <li key={i} className="flex items-start">
-                    <span className="w-6 h-6 bg-accent-100 rounded-full flex items-center justify-center text-accent-600 mr-3 mt-0.5 text-sm font-bold">{i + 1}</span>
-                    <span className="text-secondary-600">{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            ))}
           </div>
         )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+          {/* Form Section */}
+          <div className="lg:col-span-2">
+            <form onSubmit={handleSubmit} className="card sticky top-24">
+              {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100 mb-4">{error}</div>}
+
+              {/* Step 1: Basic Info */}
+              {step === 1 && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <FileText className="w-4 h-4 text-primary-600" />
+                    </div>
+                    <h3 className="text-lg font-bold text-secondary-700">Tell us about your role</h3>
+                  </div>
+
+                  <div>
+                    <label className="label">Job Title</label>
+                    <input
+                      type="text"
+                      value={form.job_title}
+                      onChange={e => setForm({...form, job_title: e.target.value})}
+                      className="input"
+                      placeholder="e.g., Senior Software Engineer"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">Industry</label>
+                      <select
+                        value={form.industry}
+                        onChange={e => setForm({...form, industry: e.target.value})}
+                        className="select"
+                        required
+                      >
+                        {industries.map(i => <option key={i} value={i}>{i}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">Location</label>
+                      <select
+                        value={form.location}
+                        onChange={e => setForm({...form, location: e.target.value})}
+                        className="select"
+                      >
+                        <option value="">Any location</option>
+                        {locations.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">Current Salary ($)</label>
+                      <input
+                        type="number"
+                        value={form.current_salary}
+                        onChange={e => setForm({...form, current_salary: e.target.value})}
+                        className="input"
+                        placeholder="85000"
+                        min="0"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Target Salary ($)</label>
+                      <input
+                        type="number"
+                        value={form.target_salary}
+                        onChange={e => setForm({...form, target_salary: e.target.value})}
+                        className="input"
+                        placeholder="100000"
+                        min="0"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Raise Calculator */}
+                  {raiseAmount > 0 && (
+                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-secondary-600 text-sm">Your raise request:</span>
+                        <div className="text-right">
+                          <span className="text-2xl font-bold text-green-600">${raiseAmount.toLocaleString()}</span>
+                          <span className="text-green-500 text-sm ml-2">(+{raisePercent}%)</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    disabled={!form.job_title || !form.current_salary || !form.target_salary}
+                    className="btn-primary w-full py-4 flex items-center justify-center gap-2"
+                  >
+                    Continue <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Step 2: Achievements */}
+              {step === 2 && (
+                <div className="space-y-5 animate-fadeIn">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-primary-600" />
+                    </div>
+                    <h3 className="text-lg font-bold text-secondary-700">Highlight your wins</h3>
+                  </div>
+
+                  <p className="text-sm text-secondary-500 bg-secondary-50 p-3 rounded-lg">
+                    Add specific achievements with metrics when possible. Example: "Increased sales by 25%" or "Led team of 5 engineers"
+                  </p>
+
+                  <div className="space-y-3">
+                    {form.achievements.map((a, i) => (
+                      <div key={i} className="flex gap-2">
+                        <div className="flex-1 relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 text-xs font-bold">
+                            {i + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={a}
+                            onChange={e => updateAchievement(i, e.target.value)}
+                            className="input pl-12"
+                            placeholder="Describe an achievement..."
+                          />
+                        </div>
+                        {form.achievements.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeAchievement(i)}
+                            className="w-10 h-10 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {form.achievements.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={addAchievement}
+                      className="w-full py-3 border-2 border-dashed border-secondary-200 rounded-xl text-secondary-500 hover:border-primary-300 hover:text-primary-600 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <span className="w-6 h-6 bg-secondary-100 rounded-full flex items-center justify-center">+</span>
+                      Add another achievement
+                    </button>
+                  )}
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="btn-secondary flex-1 py-4"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading || !form.achievements.some(a => a.trim())}
+                      className="btn-primary flex-1 py-4 flex items-center justify-center gap-2"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-5 h-5" />
+                          Generate Script
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Summary shown in form area */}
+              {step === 3 && script && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Target className="w-4 h-4 text-green-600" />
+                    </div>
+                    <h3 className="text-lg font-bold text-secondary-700">Your Ask</h3>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-primary-50 to-secondary-50 rounded-xl p-5 text-center">
+                    <div className="text-sm text-secondary-500 mb-1">{form.job_title}</div>
+                    <div className="flex items-center justify-center gap-4">
+                      <div>
+                        <div className="text-secondary-400 text-xs">Current</div>
+                        <div className="text-xl font-bold text-secondary-600">${parseFloat(form.current_salary).toLocaleString()}</div>
+                      </div>
+                      <ArrowRight className="w-6 h-6 text-primary-400" />
+                      <div>
+                        <div className="text-primary-500 text-xs">Target</div>
+                        <div className="text-2xl font-bold text-primary-600">${parseFloat(form.target_salary).toLocaleString()}</div>
+                      </div>
+                    </div>
+                    <div className="mt-3 inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                      +${raiseAmount.toLocaleString()} ({raisePercent}% increase)
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => { setStep(1); setScript(null); }}
+                    className="btn-secondary w-full py-3"
+                  >
+                    Start Over
+                  </button>
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Script Display */}
+          <div className="lg:col-span-3">
+            {script ? (
+              <div className="space-y-4 animate-fadeIn">
+                <div className="card">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-secondary-700 flex items-center gap-2">
+                      <MessageCircle className="w-6 h-6 text-primary-500" />
+                      Your Negotiation Script
+                    </h3>
+                    <button
+                      onClick={() => copyToClipboard(
+                        `${script.opening}\n\n${script.market_data}\n\n${script.achievements}\n\n${script.ask}\n\n${script.closing}`,
+                        'all'
+                      )}
+                      className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                    >
+                      {copiedSection === 'all' ? '✓ Copied!' : 'Copy All'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <ScriptSection
+                      icon="👋"
+                      step={1}
+                      title="Opening"
+                      content={script.opening}
+                      onCopy={() => copyToClipboard(script.opening, 'opening')}
+                      copied={copiedSection === 'opening'}
+                    />
+                    <ScriptSection
+                      icon="📊"
+                      step={2}
+                      title="Market Data"
+                      content={script.market_data}
+                      onCopy={() => copyToClipboard(script.market_data, 'market')}
+                      copied={copiedSection === 'market'}
+                    />
+                    <ScriptSection
+                      icon="⭐"
+                      step={3}
+                      title="Your Value"
+                      content={script.achievements}
+                      onCopy={() => copyToClipboard(script.achievements, 'value')}
+                      copied={copiedSection === 'value'}
+                    />
+                    <ScriptSection
+                      icon="💰"
+                      step={4}
+                      title="The Ask"
+                      content={script.ask}
+                      onCopy={() => copyToClipboard(script.ask, 'ask')}
+                      copied={copiedSection === 'ask'}
+                      highlight
+                    />
+                    <ScriptSection
+                      icon="🤝"
+                      step={5}
+                      title="Closing"
+                      content={script.closing}
+                      onCopy={() => copyToClipboard(script.closing, 'closing')}
+                      copied={copiedSection === 'closing'}
+                    />
+                  </div>
+                </div>
+
+                {/* Market Data Points Card */}
+                {script.data_points && (
+                  <div className="card bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
+                    <h3 className="text-lg font-bold text-secondary-700 mb-4 flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-blue-500" />
+                      Your Market Data
+                    </h3>
+
+                    {/* Percentile Position Visual */}
+                    <div className="bg-white rounded-xl p-4 mb-4">
+                      <div className="flex justify-between text-xs text-secondary-400 mb-2">
+                        <span>P25</span>
+                        <span>Median</span>
+                        <span>P75</span>
+                        <span>P90</span>
+                      </div>
+                      <div className="relative h-4 bg-gradient-to-r from-red-200 via-yellow-200 via-green-200 to-emerald-300 rounded-full mb-2">
+                        {/* Current position marker */}
+                        <div
+                          className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-secondary-500 border-2 border-white rounded-full shadow"
+                          style={{ left: `${Math.min(Math.max(script.data_points.your_percentile, 3), 97)}%` }}
+                          title="Your current salary"
+                        />
+                        {/* Target position marker */}
+                        <div
+                          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-primary-600 border-2 border-white rounded-full shadow-lg"
+                          style={{ left: `${Math.min(Math.max(script.data_points.target_percentile, 3), 97)}%` }}
+                          title="Your target salary"
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs font-medium">
+                        <span className="text-secondary-500">${(script.data_points.market_p25/1000).toFixed(0)}k</span>
+                        <span className="text-secondary-600">${(script.data_points.market_median/1000).toFixed(0)}k</span>
+                        <span className="text-secondary-500">${(script.data_points.market_p75/1000).toFixed(0)}k</span>
+                        <span className="text-secondary-500">${(script.data_points.market_p90/1000).toFixed(0)}k</span>
+                      </div>
+                      <div className="flex items-center justify-center gap-4 mt-3 text-xs">
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 bg-secondary-500 rounded-full"></span>
+                          Current ({script.data_points.your_percentile}th)
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 bg-primary-600 rounded-full"></span>
+                          Target ({script.data_points.target_percentile}th)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Key Numbers Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="bg-white rounded-lg p-3 text-center">
+                        <div className="text-xs text-secondary-400 mb-1">Your Current</div>
+                        <div className="text-lg font-bold text-secondary-700">${script.data_points.your_salary.toLocaleString()}</div>
+                        <div className="text-xs text-secondary-400">{script.data_points.your_percentile}th percentile</div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 text-center">
+                        <div className="text-xs text-secondary-400 mb-1">Market Median</div>
+                        <div className="text-lg font-bold text-blue-600">${script.data_points.market_median.toLocaleString()}</div>
+                        <div className="text-xs text-secondary-400">50th percentile</div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 text-center">
+                        <div className="text-xs text-secondary-400 mb-1">Your Target</div>
+                        <div className="text-lg font-bold text-primary-600">${script.data_points.target_salary.toLocaleString()}</div>
+                        <div className="text-xs text-secondary-400">{script.data_points.target_percentile}th percentile</div>
+                      </div>
+                      <div className="bg-white rounded-lg p-3 text-center">
+                        <div className="text-xs text-secondary-400 mb-1">Raise Amount</div>
+                        <div className="text-lg font-bold text-green-600">+${script.data_points.increase_amount.toLocaleString()}</div>
+                        <div className="text-xs text-green-500">+{script.data_points.increase_percent}%</div>
+                      </div>
+                    </div>
+
+                    {/* Gap to Median Alert */}
+                    {script.data_points.gap_to_median > 0 && (
+                      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
+                        <span className="text-amber-500 text-lg">⚠️</span>
+                        <div>
+                          <div className="font-medium text-secondary-700 text-sm">You're ${script.data_points.gap_to_median.toLocaleString()} below market median</div>
+                          <div className="text-xs text-secondary-500">That's {script.data_points.gap_to_median_percent}% below what the typical professional in your field earns.</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-4 text-xs text-secondary-400 text-center">
+                      Based on {script.data_points.sample_size} salary records
+                      {script.data_points.industry && ` in ${script.data_points.industry}`}
+                      {script.data_points.location && ` • ${script.data_points.location}`}
+                    </div>
+                  </div>
+                )}
+
+                {/* Tips Card */}
+                <div className="card bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100">
+                  <h3 className="text-lg font-bold text-secondary-700 mb-4 flex items-center gap-2">
+                    <Lightbulb className="w-5 h-5 text-amber-500" />
+                    Pro Tips for Success
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {script.tips.map((tip, i) => (
+                      <div key={i} className="flex items-start gap-3 bg-white/60 rounded-lg p-3">
+                        <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold flex-shrink-0">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm text-secondary-600">{tip}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="card bg-gradient-to-br from-gray-50 to-white border-2 border-dashed border-gray-200 flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-20 h-20 bg-primary-50 rounded-2xl flex items-center justify-center mb-4">
+                  <MessageCircle className="w-10 h-10 text-primary-300" />
+                </div>
+                <h3 className="text-xl font-semibold text-secondary-600 mb-2">Your script will appear here</h3>
+                <p className="text-secondary-400 max-w-sm">
+                  Fill out the form to generate a personalized negotiation script backed by market data
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
-function ScriptSection({ title, content, color }) {
-  const colors = {
-    primary: 'border-primary-400 bg-primary-50',
-    secondary: 'border-secondary-400 bg-secondary-50',
-    accent: 'border-accent-400 bg-accent-50'
-  }
-
+function ScriptSection({ icon, step, title, content, onCopy, copied, highlight }) {
   return (
-    <div className={`border-l-4 pl-4 py-2 ${colors[color]}`}>
-      <h4 className="font-semibold text-secondary-700 mb-1">{title}</h4>
-      <p className="text-secondary-600">{content}</p>
+    <div className={`relative group ${highlight ? 'bg-gradient-to-r from-primary-50 to-secondary-50 rounded-xl p-4 border border-primary-100' : ''}`}>
+      <div className="flex items-start gap-3">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
+          highlight ? 'bg-primary-100' : 'bg-gray-100'
+        }`}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <h4 className="font-semibold text-secondary-700 flex items-center gap-2">
+              <span className="text-xs text-secondary-400">Step {step}</span>
+              {title}
+            </h4>
+            <button
+              onClick={onCopy}
+              className="opacity-0 group-hover:opacity-100 text-xs text-primary-500 hover:text-primary-600 transition-opacity"
+            >
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className={`text-secondary-600 ${highlight ? 'font-medium' : ''}`}>{content}</p>
+        </div>
+      </div>
+      {!highlight && <div className="absolute left-5 top-12 bottom-0 w-px bg-gray-200 -mb-4" />}
     </div>
   )
 }
@@ -1176,11 +1928,13 @@ function SubmitPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-secondary-700">Submit Salary Data</h1>
-        <p className="text-secondary-400 mt-2">Your anonymous contribution helps others make informed decisions</p>
-      </div>
+    <div className="min-h-screen hero-gradient relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 via-transparent to-secondary-500/5"></div>
+      <div className="max-w-2xl mx-auto px-4 py-8 relative">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-secondary-700">Submit Salary Data</h1>
+          <p className="text-secondary-400 mt-2">Your anonymous contribution helps others make informed decisions</p>
+        </div>
 
       <form onSubmit={handleSubmit} className="card space-y-6">
         {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100">{error}</div>}
@@ -1263,6 +2017,7 @@ function SubmitPage() {
           {loading ? 'Submitting...' : 'Submit Anonymously'}
         </button>
       </form>
+      </div>
     </div>
   )
 }
@@ -1335,13 +2090,15 @@ function AIAdvisorPage() {
   ]
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
-            <Bot className="w-7 h-7 text-white" />
-          </div>
-          <div>
+    <div className="min-h-screen hero-gradient relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 via-transparent to-secondary-500/5"></div>
+      <div className="max-w-4xl mx-auto px-4 py-8 relative">
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
+              <Bot className="w-7 h-7 text-white" />
+            </div>
+            <div>
             <h1 className="text-3xl font-bold text-secondary-700">AI Salary Advisor</h1>
             <p className="text-secondary-400 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary-500" />
@@ -1510,6 +2267,7 @@ function AIAdvisorPage() {
             <p className="font-medium mb-1">About this AI</p>
             <p>This advisor uses Snowflake Cortex AI with Llama to provide personalized salary negotiation advice based on market data. Your conversations are not stored.</p>
           </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1667,7 +2425,7 @@ function AppContent() {
       </Routes>
 
       {/* Footer */}
-      <footer className="bg-secondary-700 text-white mt-16 py-12">
+      <footer className="bg-secondary-700 text-white py-12">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-3 mb-4 md:mb-0">
