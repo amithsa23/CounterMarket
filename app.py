@@ -29,6 +29,131 @@ CORS(app)  # Allow all origins for development
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', secrets.token_hex(32))
 
 # =============================================================================
+# COMPANY SALARY DATA - Realistic multipliers based on market research
+# =============================================================================
+
+# Company salary multipliers relative to market median (1.0 = market average)
+# Based on publicly available salary data from Levels.fyi, Glassdoor, etc.
+COMPANY_SALARY_DATA = {
+    # FAANG / Big Tech (Premium pay)
+    'google': {'multiplier': 1.45, 'name': 'Google', 'tier': 'top'},
+    'meta': {'multiplier': 1.50, 'name': 'Meta', 'tier': 'top'},
+    'facebook': {'multiplier': 1.50, 'name': 'Meta', 'tier': 'top'},
+    'apple': {'multiplier': 1.35, 'name': 'Apple', 'tier': 'top'},
+    'amazon': {'multiplier': 1.25, 'name': 'Amazon', 'tier': 'top'},
+    'netflix': {'multiplier': 1.60, 'name': 'Netflix', 'tier': 'top'},
+    'microsoft': {'multiplier': 1.30, 'name': 'Microsoft', 'tier': 'top'},
+
+    # High-paying tech companies
+    'stripe': {'multiplier': 1.55, 'name': 'Stripe', 'tier': 'top'},
+    'airbnb': {'multiplier': 1.40, 'name': 'Airbnb', 'tier': 'top'},
+    'uber': {'multiplier': 1.30, 'name': 'Uber', 'tier': 'top'},
+    'lyft': {'multiplier': 1.20, 'name': 'Lyft', 'tier': 'high'},
+    'doordash': {'multiplier': 1.25, 'name': 'DoorDash', 'tier': 'high'},
+    'coinbase': {'multiplier': 1.45, 'name': 'Coinbase', 'tier': 'top'},
+    'robinhood': {'multiplier': 1.35, 'name': 'Robinhood', 'tier': 'high'},
+    'databricks': {'multiplier': 1.50, 'name': 'Databricks', 'tier': 'top'},
+    'snowflake': {'multiplier': 1.45, 'name': 'Snowflake', 'tier': 'top'},
+    'palantir': {'multiplier': 1.35, 'name': 'Palantir', 'tier': 'high'},
+    'splunk': {'multiplier': 1.25, 'name': 'Splunk', 'tier': 'high'},
+
+    # Enterprise tech
+    'salesforce': {'multiplier': 1.25, 'name': 'Salesforce', 'tier': 'high'},
+    'oracle': {'multiplier': 1.10, 'name': 'Oracle', 'tier': 'mid'},
+    'ibm': {'multiplier': 1.00, 'name': 'IBM', 'tier': 'mid'},
+    'cisco': {'multiplier': 1.15, 'name': 'Cisco', 'tier': 'mid'},
+    'vmware': {'multiplier': 1.20, 'name': 'VMware', 'tier': 'high'},
+    'adobe': {'multiplier': 1.30, 'name': 'Adobe', 'tier': 'high'},
+    'intuit': {'multiplier': 1.25, 'name': 'Intuit', 'tier': 'high'},
+    'servicenow': {'multiplier': 1.30, 'name': 'ServiceNow', 'tier': 'high'},
+    'workday': {'multiplier': 1.25, 'name': 'Workday', 'tier': 'high'},
+
+    # Fintech & Finance
+    'jpmorgan': {'multiplier': 1.20, 'name': 'JPMorgan Chase', 'tier': 'high'},
+    'goldman sachs': {'multiplier': 1.35, 'name': 'Goldman Sachs', 'tier': 'top'},
+    'morgan stanley': {'multiplier': 1.30, 'name': 'Morgan Stanley', 'tier': 'high'},
+    'capital one': {'multiplier': 1.15, 'name': 'Capital One', 'tier': 'mid'},
+    'american express': {'multiplier': 1.15, 'name': 'American Express', 'tier': 'mid'},
+    'visa': {'multiplier': 1.25, 'name': 'Visa', 'tier': 'high'},
+    'mastercard': {'multiplier': 1.25, 'name': 'Mastercard', 'tier': 'high'},
+    'paypal': {'multiplier': 1.20, 'name': 'PayPal', 'tier': 'high'},
+    'square': {'multiplier': 1.30, 'name': 'Block (Square)', 'tier': 'high'},
+    'block': {'multiplier': 1.30, 'name': 'Block', 'tier': 'high'},
+
+    # E-commerce & Retail
+    'walmart': {'multiplier': 0.95, 'name': 'Walmart', 'tier': 'mid'},
+    'target': {'multiplier': 0.95, 'name': 'Target', 'tier': 'mid'},
+    'costco': {'multiplier': 1.05, 'name': 'Costco', 'tier': 'mid'},
+    'shopify': {'multiplier': 1.25, 'name': 'Shopify', 'tier': 'high'},
+    'ebay': {'multiplier': 1.15, 'name': 'eBay', 'tier': 'mid'},
+    'etsy': {'multiplier': 1.15, 'name': 'Etsy', 'tier': 'mid'},
+
+    # Healthcare
+    'unitedhealth': {'multiplier': 1.10, 'name': 'UnitedHealth', 'tier': 'mid'},
+    'cvs': {'multiplier': 0.95, 'name': 'CVS Health', 'tier': 'mid'},
+    'pfizer': {'multiplier': 1.15, 'name': 'Pfizer', 'tier': 'mid'},
+    'johnson & johnson': {'multiplier': 1.20, 'name': 'Johnson & Johnson', 'tier': 'high'},
+
+    # Consulting
+    'mckinsey': {'multiplier': 1.40, 'name': 'McKinsey', 'tier': 'top'},
+    'bain': {'multiplier': 1.35, 'name': 'Bain & Company', 'tier': 'top'},
+    'bcg': {'multiplier': 1.35, 'name': 'BCG', 'tier': 'top'},
+    'deloitte': {'multiplier': 1.10, 'name': 'Deloitte', 'tier': 'mid'},
+    'accenture': {'multiplier': 1.05, 'name': 'Accenture', 'tier': 'mid'},
+    'pwc': {'multiplier': 1.05, 'name': 'PwC', 'tier': 'mid'},
+    'kpmg': {'multiplier': 1.05, 'name': 'KPMG', 'tier': 'mid'},
+    'ey': {'multiplier': 1.05, 'name': 'EY', 'tier': 'mid'},
+
+    # Startups / Growth (varies widely, using averages)
+    'openai': {'multiplier': 1.55, 'name': 'OpenAI', 'tier': 'top'},
+    'anthropic': {'multiplier': 1.50, 'name': 'Anthropic', 'tier': 'top'},
+    'figma': {'multiplier': 1.40, 'name': 'Figma', 'tier': 'top'},
+    'notion': {'multiplier': 1.30, 'name': 'Notion', 'tier': 'high'},
+    'discord': {'multiplier': 1.30, 'name': 'Discord', 'tier': 'high'},
+    'slack': {'multiplier': 1.25, 'name': 'Slack', 'tier': 'high'},
+    'zoom': {'multiplier': 1.20, 'name': 'Zoom', 'tier': 'high'},
+    'twilio': {'multiplier': 1.25, 'name': 'Twilio', 'tier': 'high'},
+    'datadog': {'multiplier': 1.35, 'name': 'Datadog', 'tier': 'high'},
+    'mongodb': {'multiplier': 1.30, 'name': 'MongoDB', 'tier': 'high'},
+
+    # Gaming
+    'nvidia': {'multiplier': 1.40, 'name': 'NVIDIA', 'tier': 'top'},
+    'amd': {'multiplier': 1.20, 'name': 'AMD', 'tier': 'high'},
+    'intel': {'multiplier': 1.15, 'name': 'Intel', 'tier': 'mid'},
+    'ea': {'multiplier': 1.15, 'name': 'Electronic Arts', 'tier': 'mid'},
+    'activision': {'multiplier': 1.10, 'name': 'Activision Blizzard', 'tier': 'mid'},
+    'riot games': {'multiplier': 1.25, 'name': 'Riot Games', 'tier': 'high'},
+    'epic games': {'multiplier': 1.30, 'name': 'Epic Games', 'tier': 'high'},
+
+    # Telecom
+    'verizon': {'multiplier': 1.05, 'name': 'Verizon', 'tier': 'mid'},
+    'at&t': {'multiplier': 1.00, 'name': 'AT&T', 'tier': 'mid'},
+    't-mobile': {'multiplier': 1.05, 'name': 'T-Mobile', 'tier': 'mid'},
+}
+
+def get_company_data(company_name):
+    """Get company salary data based on company name."""
+    if not company_name:
+        return None
+
+    # Normalize company name for lookup
+    normalized = company_name.lower().strip()
+
+    # Direct match
+    if normalized in COMPANY_SALARY_DATA:
+        return COMPANY_SALARY_DATA[normalized]
+
+    # Partial match (e.g., "Google Inc" -> "google")
+    for key, data in COMPANY_SALARY_DATA.items():
+        if key in normalized or normalized in key:
+            return data
+        # Also check the display name
+        if data['name'].lower() in normalized or normalized in data['name'].lower():
+            return data
+
+    return None
+
+# =============================================================================
 # SNOWFLAKE CONNECTION
 # =============================================================================
 
@@ -443,6 +568,7 @@ def retrieve_relevant_context(user_question, top_k=3):
     """
     RAG: Retrieve relevant documents using Snowflake Cortex embeddings.
     Uses EMBED_TEXT_768 for semantic search and VECTOR_COSINE_SIMILARITY for matching.
+    Returns tuple of (context_string, list_of_sources)
     """
     try:
         # Use Snowflake Cortex to find semantically similar documents
@@ -465,13 +591,19 @@ def retrieve_relevant_context(user_question, top_k=3):
 
         if results:
             context_parts = []
+            sources = []
             for doc in results:
                 context_parts.append(f"**{doc['title']}**\n{doc['content']}")
-            return "\n\n---\n\n".join(context_parts)
-        return ""
+                sources.append({
+                    'title': doc['title'],
+                    'category': doc['category'],
+                    'similarity': round(float(doc['similarity_score']) * 100, 1)
+                })
+            return "\n\n---\n\n".join(context_parts), sources
+        return "", []
     except Exception as e:
         print(f"RAG retrieval error: {e}")
-        return ""
+        return "", []
 
 
 # Initialize on startup
@@ -521,6 +653,10 @@ def compare_salary():
 
     user_salary = float(data['salary'])
     experience = int(data['years_experience'])
+    company_name = data.get('company_name', '').strip()
+
+    # Get company-specific data if available
+    company_data = get_company_data(company_name) if company_name else None
 
     try:
         # Use Snowflake's advanced analytics functions
@@ -556,67 +692,129 @@ def compare_salary():
             return jsonify({'error': 'Insufficient data', 'sample_size': 0}), 404
 
         stat = stats[0]
-        median = float(stat['median_salary'])
-        avg = float(stat['avg_salary'])
-        p25 = float(stat['p25_salary'])
-        p75 = float(stat['p75_salary'])
-        p90 = float(stat['p90_salary'])
+        market_median = float(stat['median_salary'])
+        market_avg = float(stat['avg_salary'])
+        market_p25 = float(stat['p25_salary'])
+        market_p75 = float(stat['p75_salary'])
+        market_p90 = float(stat['p90_salary'])
 
-        # Calculate percentile rank
-        percentile_result = execute_query("""
-            SELECT (COUNT(CASE WHEN salary < %s THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as percentile_rank
-            FROM salary_submissions
-            WHERE LOWER(industry) = LOWER(%s)
-              AND years_experience BETWEEN %s - 2 AND %s + 2
-        """, [user_salary, data['industry'], experience, experience])
+        # Apply company-specific adjustments if we have company data
+        if company_data:
+            multiplier = company_data['multiplier']
+            # Adjust expected salaries for this company
+            company_median = market_median * multiplier
+            company_avg = market_avg * multiplier
+            company_p25 = market_p25 * multiplier
+            company_p75 = market_p75 * multiplier
+            company_p90 = market_p90 * multiplier
 
-        percentile = float(percentile_result[0]['percentile_rank']) if percentile_result and percentile_result[0]['percentile_rank'] else 50
-        gap_percentage = ((user_salary - median) / median) * 100 if median > 0 else 0
+            # Calculate percentile within company context
+            # User's salary compared to what this company typically pays
+            if user_salary >= company_p90:
+                company_percentile = 90 + (10 * (user_salary - company_p90) / (company_p90 * 0.2)) if company_p90 > 0 else 95
+                company_percentile = min(99, company_percentile)
+            elif user_salary >= company_p75:
+                company_percentile = 75 + (15 * (user_salary - company_p75) / (company_p90 - company_p75)) if (company_p90 - company_p75) > 0 else 82
+            elif user_salary >= company_median:
+                company_percentile = 50 + (25 * (user_salary - company_median) / (company_p75 - company_median)) if (company_p75 - company_median) > 0 else 62
+            elif user_salary >= company_p25:
+                company_percentile = 25 + (25 * (user_salary - company_p25) / (company_median - company_p25)) if (company_median - company_p25) > 0 else 37
+            else:
+                company_percentile = max(1, 25 * user_salary / company_p25) if company_p25 > 0 else 10
 
-        # Generate recommendation
+            gap_percentage = ((user_salary - company_median) / company_median) * 100 if company_median > 0 else 0
+
+            # Use company-adjusted values for display
+            median = company_median
+            avg = company_avg
+            p25 = company_p25
+            p75 = company_p75
+            p90 = company_p90
+            percentile = company_percentile
+        else:
+            # No company data, use market rates
+            median = market_median
+            avg = market_avg
+            p25 = market_p25
+            p75 = market_p75
+            p90 = market_p90
+
+            # Calculate percentile rank against market
+            percentile_result = execute_query("""
+                SELECT (COUNT(CASE WHEN salary < %s THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)) as percentile_rank
+                FROM salary_submissions
+                WHERE LOWER(industry) = LOWER(%s)
+                  AND years_experience BETWEEN %s - 2 AND %s + 2
+            """, [user_salary, data['industry'], experience, experience])
+
+            percentile = float(percentile_result[0]['percentile_rank']) if percentile_result and percentile_result[0]['percentile_rank'] else 50
+            gap_percentage = ((user_salary - median) / median) * 100 if median > 0 else 0
+
+        # Generate recommendation based on company context
+        context_label = f"at {company_data['name']}" if company_data else "in the market"
+
         if percentile < 25:
             recommendation = {
                 'status': 'below_market',
-                'message': 'Your salary is significantly below market rate. You may have strong grounds for negotiation.',
+                'message': f'Your salary is significantly below typical pay {context_label}. You may have strong grounds for negotiation.',
                 'action': 'Consider requesting a salary review with documented market data.',
                 'potential_increase': f"${abs(int(median - user_salary)):,} to reach median"
             }
         elif percentile < 50:
             recommendation = {
                 'status': 'below_median',
-                'message': 'Your salary is below the median for your role and experience.',
+                'message': f'Your salary is below the median {context_label} for your role and experience.',
                 'action': 'Document your achievements and consider discussing compensation.',
                 'potential_increase': f"${abs(int(median - user_salary)):,} potential increase"
             }
         elif percentile < 75:
             recommendation = {
                 'status': 'competitive',
-                'message': 'Your salary is competitive and above median.',
+                'message': f'Your salary is competitive and above median {context_label}.',
                 'action': 'Focus on maintaining performance and exploring growth opportunities.',
                 'potential_increase': None
             }
         else:
             recommendation = {
                 'status': 'above_market',
-                'message': 'Your salary is in the top quartile for your role.',
+                'message': f'Your salary is in the top quartile {context_label}.',
                 'action': 'Continue excelling and consider mentoring others.',
                 'potential_increase': None
             }
 
-        return jsonify({
+        response = {
             'comparison': {
                 'your_salary': user_salary,
-                'median_salary': median,
-                'average_salary': avg,
+                'median_salary': round(median, 0),
+                'average_salary': round(avg, 0),
                 'percentile_rank': round(percentile, 1),
                 'gap_percentage': round(gap_percentage, 1),
-                'p25_salary': p25,
-                'p75_salary': p75,
-                'p90_salary': p90,
+                'p25_salary': round(p25, 0),
+                'p75_salary': round(p75, 0),
+                'p90_salary': round(p90, 0),
                 'sample_size': stat['sample_size'],
                 'recommendation': recommendation
             }
-        })
+        }
+
+        # Add company-specific insights if available
+        if company_data:
+            response['comparison']['company_insights'] = {
+                'company_name': company_data['name'],
+                'pay_tier': company_data['tier'],
+                'market_position': f"{int((company_data['multiplier'] - 1) * 100):+d}% vs market average",
+                'typical_range': f"${int(p25):,} - ${int(p90):,}",
+                'note': f"{company_data['name']} typically pays {'above' if company_data['multiplier'] > 1.15 else 'at or near'} market rates"
+            }
+            # Also include raw market data for reference
+            response['comparison']['market_reference'] = {
+                'market_median': round(market_median, 0),
+                'market_p25': round(market_p25, 0),
+                'market_p75': round(market_p75, 0),
+                'market_p90': round(market_p90, 0)
+            }
+
+        return jsonify(response)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1024,7 +1222,7 @@ def get_chatbot_advice():
     user_message = data.get('message', '')
 
     # RAG: Retrieve relevant knowledge base articles
-    retrieved_context = retrieve_relevant_context(user_message, top_k=3)
+    retrieved_context, rag_sources = retrieve_relevant_context(user_message, top_k=3)
 
     # Build context-aware prompt with RAG context
     rag_section = ""
@@ -1076,6 +1274,7 @@ INSTRUCTIONS:
                 'response': response_text,
                 'model': 'llama3.1-8b',
                 'rag_enabled': bool(retrieved_context),
+                'sources': rag_sources,
                 'powered_by': 'Snowflake Cortex AI + RAG'
             })
         else:

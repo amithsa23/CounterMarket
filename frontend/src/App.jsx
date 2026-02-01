@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import {
   TrendingUp, Users, DollarSign, BarChart3,
-  FileText, Building2, Menu, X, ChevronRight,
+  FileText, Building2, Menu, X, ChevronRight, ChevronDown, ChevronUp,
   MapPin, Lightbulb, ArrowRight, Target, Zap,
   MessageCircle, Send, Bot, Sparkles, LogIn, LogOut, User
 } from 'lucide-react'
@@ -718,7 +718,7 @@ function ComparePage() {
           </div>
 
           <div>
-            <label className="label">Company <span className="text-secondary-400 font-normal">(Optional)</span></label>
+            <label className="label">Company</label>
             <input
               type="text"
               value={form.company_name}
@@ -768,6 +768,49 @@ function ComparePage() {
               </ResponsiveContainer>
               <p className="text-xs text-secondary-400 mt-2 text-center">Based on {result.sample_size} data points</p>
             </div>
+
+            {/* Company Insights */}
+            {result.company_insights && (
+              <div className="card bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100">
+                <h3 className="text-lg font-bold text-secondary-700 mb-4 flex items-center">
+                  <Building2 className="w-5 h-5 mr-2 text-indigo-500" />
+                  {result.company_insights.company_name} Salary Insights
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  <div className="bg-white rounded-lg p-3 text-center">
+                    <div className="text-xs text-secondary-400">Pay Tier</div>
+                    <div className={`text-lg font-bold ${
+                      result.company_insights.pay_tier === 'top' ? 'text-green-600' :
+                      result.company_insights.pay_tier === 'high' ? 'text-blue-600' : 'text-secondary-600'
+                    }`}>
+                      {result.company_insights.pay_tier === 'top' ? 'Top Tier' :
+                       result.company_insights.pay_tier === 'high' ? 'High' : 'Market Rate'}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 text-center">
+                    <div className="text-xs text-secondary-400">vs Market</div>
+                    <div className="text-lg font-bold text-indigo-600">{result.company_insights.market_position}</div>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 text-center col-span-2">
+                    <div className="text-xs text-secondary-400">Typical Range at {result.company_insights.company_name}</div>
+                    <div className="text-lg font-bold text-secondary-700">{result.company_insights.typical_range}</div>
+                  </div>
+                </div>
+                <p className="text-sm text-secondary-600 bg-white/50 rounded-lg p-3">
+                  {result.company_insights.note}
+                </p>
+                {result.market_reference && (
+                  <div className="mt-3 pt-3 border-t border-indigo-100">
+                    <div className="text-xs text-secondary-400 mb-2">General Market Reference</div>
+                    <div className="flex gap-4 text-xs text-secondary-500">
+                      <span>Median: ${result.market_reference.market_median?.toLocaleString()}</span>
+                      <span>75th: ${result.market_reference.market_p75?.toLocaleString()}</span>
+                      <span>90th: ${result.market_reference.market_p90?.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Cost of Living Comparison */}
             <div className="card">
@@ -1418,9 +1461,9 @@ function NegotiatePage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Form Section */}
-          <div className="lg:col-span-2">
+          <div>
             <form onSubmit={handleSubmit} className="card sticky top-24">
               {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm border border-red-100 mb-4">{error}</div>}
 
@@ -1639,15 +1682,82 @@ function NegotiatePage() {
                   >
                     Start Over
                   </button>
+
+                  {/* Pro Tips */}
+                  {script && (
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mt-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Lightbulb className="w-5 h-5 text-amber-500" />
+                        <span className="font-semibold text-secondary-700">Pro Tips</span>
+                      </div>
+                      <div className="space-y-2">
+                        {script.tips.map((tip, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <span className="w-5 h-5 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 font-bold text-xs flex-shrink-0">{i + 1}</span>
+                            <span className="text-sm text-secondary-600">{tip}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </form>
           </div>
 
           {/* Script Display */}
-          <div className="lg:col-span-3">
+          <div>
             {script ? (
-              <div className="space-y-4 animate-fadeIn">
+              <div className="animate-fadeIn space-y-6">
+                {/* Market Data Summary */}
+                {script.data_points && (
+                  <div className="card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+                    <h4 className="text-lg font-semibold text-secondary-700 mb-4">Market Position</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-4">
+                      <div className="bg-white rounded-xl p-3">
+                        <div className="text-sm text-secondary-400">Your Current</div>
+                        <div className="text-2xl font-bold text-secondary-700">${(script.data_points.your_salary/1000).toFixed(0)}k</div>
+                        <div className="text-sm text-secondary-400">{script.data_points.your_percentile}th percentile</div>
+                      </div>
+                      <div className="bg-white rounded-xl p-3">
+                        <div className="text-sm text-secondary-400">Your Target</div>
+                        <div className="text-2xl font-bold text-primary-600">${(script.data_points.target_salary/1000).toFixed(0)}k</div>
+                        <div className="text-sm text-green-500">+{script.data_points.increase_percent}% increase</div>
+                      </div>
+                      <div className="bg-white rounded-xl p-3">
+                        <div className="text-sm text-secondary-400">Market Median</div>
+                        <div className="text-2xl font-bold text-secondary-600">${(script.data_points.market_median/1000).toFixed(0)}k</div>
+                        <div className="text-sm text-secondary-400">50th percentile</div>
+                      </div>
+                      <div className="bg-white rounded-xl p-3">
+                        <div className="text-sm text-secondary-400">Market Top</div>
+                        <div className="text-2xl font-bold text-secondary-600">${(script.data_points.market_p90/1000).toFixed(0)}k</div>
+                        <div className="text-sm text-secondary-400">90th percentile</div>
+                      </div>
+                    </div>
+                    {/* Percentile Bar */}
+                    <div className="relative h-4 bg-gradient-to-r from-red-200 via-yellow-200 to-green-200 rounded-full">
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-secondary-500 border-2 border-white rounded-full shadow-lg"
+                        style={{ left: `${Math.min(Math.max(script.data_points.your_percentile, 3), 97)}%` }}
+                        title={`Your current: ${script.data_points.your_percentile}th percentile`}
+                      />
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 w-5 h-5 bg-primary-600 border-2 border-white rounded-full shadow-lg"
+                        style={{ left: `${Math.min(Math.max(script.data_points.target_percentile, 3), 97)}%` }}
+                        title={`Your target: ${script.data_points.target_percentile}th percentile`}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-secondary-400 mt-2">
+                      <span>25th: ${(script.data_points.market_p25/1000).toFixed(0)}k</span>
+                      <span>50th: ${(script.data_points.market_median/1000).toFixed(0)}k</span>
+                      <span>75th: ${(script.data_points.market_p75/1000).toFixed(0)}k</span>
+                      <span>90th: ${(script.data_points.market_p90/1000).toFixed(0)}k</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Script Card */}
                 <div className="card">
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-secondary-700 flex items-center gap-2">
@@ -1659,7 +1769,7 @@ function NegotiatePage() {
                         `${script.opening}\n\n${script.market_data}\n\n${script.achievements}\n\n${script.ask}\n\n${script.closing}`,
                         'all'
                       )}
-                      className="text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                      className="btn-secondary text-sm"
                     >
                       {copiedSection === 'all' ? '✓ Copied!' : 'Copy All'}
                     </button>
@@ -1707,115 +1817,6 @@ function NegotiatePage() {
                       onCopy={() => copyToClipboard(script.closing, 'closing')}
                       copied={copiedSection === 'closing'}
                     />
-                  </div>
-                </div>
-
-                {/* Market Data Points Card */}
-                {script.data_points && (
-                  <div className="card bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100">
-                    <h3 className="text-lg font-bold text-secondary-700 mb-4 flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5 text-blue-500" />
-                      Your Market Data
-                    </h3>
-
-                    {/* Percentile Position Visual */}
-                    <div className="bg-white rounded-xl p-4 mb-4">
-                      <div className="flex justify-between text-xs text-secondary-400 mb-2">
-                        <span>P25</span>
-                        <span>Median</span>
-                        <span>P75</span>
-                        <span>P90</span>
-                      </div>
-                      <div className="relative h-4 bg-gradient-to-r from-red-200 via-yellow-200 via-green-200 to-emerald-300 rounded-full mb-2">
-                        {/* Current position marker */}
-                        <div
-                          className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-secondary-500 border-2 border-white rounded-full shadow"
-                          style={{ left: `${Math.min(Math.max(script.data_points.your_percentile, 3), 97)}%` }}
-                          title="Your current salary"
-                        />
-                        {/* Target position marker */}
-                        <div
-                          className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-primary-600 border-2 border-white rounded-full shadow-lg"
-                          style={{ left: `${Math.min(Math.max(script.data_points.target_percentile, 3), 97)}%` }}
-                          title="Your target salary"
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs font-medium">
-                        <span className="text-secondary-500">${(script.data_points.market_p25/1000).toFixed(0)}k</span>
-                        <span className="text-secondary-600">${(script.data_points.market_median/1000).toFixed(0)}k</span>
-                        <span className="text-secondary-500">${(script.data_points.market_p75/1000).toFixed(0)}k</span>
-                        <span className="text-secondary-500">${(script.data_points.market_p90/1000).toFixed(0)}k</span>
-                      </div>
-                      <div className="flex items-center justify-center gap-4 mt-3 text-xs">
-                        <span className="flex items-center gap-1">
-                          <span className="w-3 h-3 bg-secondary-500 rounded-full"></span>
-                          Current ({script.data_points.your_percentile}th)
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="w-3 h-3 bg-primary-600 rounded-full"></span>
-                          Target ({script.data_points.target_percentile}th)
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Key Numbers Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <div className="bg-white rounded-lg p-3 text-center">
-                        <div className="text-xs text-secondary-400 mb-1">Your Current</div>
-                        <div className="text-lg font-bold text-secondary-700">${script.data_points.your_salary.toLocaleString()}</div>
-                        <div className="text-xs text-secondary-400">{script.data_points.your_percentile}th percentile</div>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 text-center">
-                        <div className="text-xs text-secondary-400 mb-1">Market Median</div>
-                        <div className="text-lg font-bold text-blue-600">${script.data_points.market_median.toLocaleString()}</div>
-                        <div className="text-xs text-secondary-400">50th percentile</div>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 text-center">
-                        <div className="text-xs text-secondary-400 mb-1">Your Target</div>
-                        <div className="text-lg font-bold text-primary-600">${script.data_points.target_salary.toLocaleString()}</div>
-                        <div className="text-xs text-secondary-400">{script.data_points.target_percentile}th percentile</div>
-                      </div>
-                      <div className="bg-white rounded-lg p-3 text-center">
-                        <div className="text-xs text-secondary-400 mb-1">Raise Amount</div>
-                        <div className="text-lg font-bold text-green-600">+${script.data_points.increase_amount.toLocaleString()}</div>
-                        <div className="text-xs text-green-500">+{script.data_points.increase_percent}%</div>
-                      </div>
-                    </div>
-
-                    {/* Gap to Median Alert */}
-                    {script.data_points.gap_to_median > 0 && (
-                      <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
-                        <span className="text-amber-500 text-lg">⚠️</span>
-                        <div>
-                          <div className="font-medium text-secondary-700 text-sm">You're ${script.data_points.gap_to_median.toLocaleString()} below market median</div>
-                          <div className="text-xs text-secondary-500">That's {script.data_points.gap_to_median_percent}% below what the typical professional in your field earns.</div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-4 text-xs text-secondary-400 text-center">
-                      Based on {script.data_points.sample_size} salary records
-                      {script.data_points.industry && ` in ${script.data_points.industry}`}
-                      {script.data_points.location && ` • ${script.data_points.location}`}
-                    </div>
-                  </div>
-                )}
-
-                {/* Tips Card */}
-                <div className="card bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100">
-                  <h3 className="text-lg font-bold text-secondary-700 mb-4 flex items-center gap-2">
-                    <Lightbulb className="w-5 h-5 text-amber-500" />
-                    Pro Tips for Success
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {script.tips.map((tip, i) => (
-                      <div key={i} className="flex items-start gap-3 bg-white/60 rounded-lg p-3">
-                        <span className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 text-xs font-bold flex-shrink-0">
-                          {i + 1}
-                        </span>
-                        <span className="text-sm text-secondary-600">{tip}</span>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>
@@ -2069,6 +2070,14 @@ function AIAdvisorPage() {
     median_salary: 120000
   })
   const [showContext, setShowContext] = useState(true)
+  const [expandedSources, setExpandedSources] = useState({})
+
+  const toggleSources = (messageIndex) => {
+    setExpandedSources(prev => ({
+      ...prev,
+      [messageIndex]: !prev[messageIndex]
+    }))
+  }
 
   const sendMessage = async (e) => {
     e.preventDefault()
@@ -2094,7 +2103,8 @@ function AIAdvisorPage() {
         role: 'assistant',
         content: data.response,
         model: data.model,
-        powered_by: data.powered_by
+        powered_by: data.powered_by,
+        sources: data.sources
       }])
     } catch (err) {
       setMessages(prev => [...prev, {
@@ -2224,6 +2234,32 @@ function AIAdvisorPage() {
                   </div>
                 )}
                 <p className="whitespace-pre-wrap">{msg.content}</p>
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <button
+                      onClick={() => toggleSources(i)}
+                      className="text-xs font-medium text-secondary-500 flex items-center gap-1 hover:text-secondary-700 transition-colors"
+                    >
+                      <FileText className="w-3 h-3" />
+                      {msg.sources.length} source{msg.sources.length !== 1 ? 's' : ''} used
+                      {expandedSources[i] ? (
+                        <ChevronUp className="w-3 h-3" />
+                      ) : (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
+                    {expandedSources[i] && (
+                      <div className="space-y-1 mt-2">
+                        {msg.sources.map((source, idx) => (
+                          <div key={idx} className="text-xs bg-white/50 rounded px-2 py-1 flex justify-between">
+                            <span className="text-secondary-600">{source.title}</span>
+                            <span className="text-primary-500">{source.similarity}% match</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -2316,7 +2352,7 @@ function AuthPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      navigate('/dashboard')
+      navigate('/')
     }
   }, [user, navigate])
 
@@ -2330,7 +2366,7 @@ function AuthPage() {
       if (isLogin) {
         const { error } = await signIn(email, password)
         if (error) throw error
-        navigate('/dashboard')
+        navigate('/')
       } else {
         const { error } = await signUp(email, password)
         if (error) throw error
@@ -2463,6 +2499,11 @@ function AppContent() {
               <p>Built for Hack Violet 2026 | Powered by Snowflake + Cortex AI</p>
               <p className="mt-1">Making salary data transparent, one submission at a time.</p>
             </div>
+          </div>
+          <div className="border-t border-secondary-600 mt-8 pt-6 text-center">
+            <p className="text-secondary-400 text-xs">
+              All data sourced from Snowflake database
+            </p>
           </div>
         </div>
       </footer>
