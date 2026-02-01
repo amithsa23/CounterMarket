@@ -521,7 +521,8 @@ function ComparePage() {
     industry: prefillData?.industry || '',
     years_experience: prefillData?.years_experience || '',
     salary: prefillData?.salary || '',
-    location: prefillData?.location || ''
+    location: prefillData?.location || '',
+    company_name: prefillData?.company_name || ''
   })
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -714,6 +715,18 @@ function ComparePage() {
               <option value="">Select location</option>
               {locations.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
+          </div>
+
+          <div>
+            <label className="label">Company <span className="text-secondary-400 font-normal">(Optional)</span></label>
+            <input
+              type="text"
+              value={form.company_name}
+              onChange={e => setForm({...form, company_name: e.target.value})}
+              className="input"
+              placeholder="e.g., Google, Amazon, Microsoft"
+            />
+            <p className="text-xs text-secondary-400 mt-1">Add for company-specific salary insights</p>
           </div>
 
           <button type="submit" disabled={loading} className="btn-primary w-full py-4">
@@ -1331,9 +1344,10 @@ function NegotiatePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen hero-gradient relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary-500/5 via-transparent to-secondary-500/5"></div>
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-secondary-600 via-secondary-500 to-primary-600 text-white py-12">
+      <div className="bg-gradient-to-br from-secondary-600 via-secondary-500 to-primary-600 text-white py-12 relative">
         <div className="max-w-5xl mx-auto px-4">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
@@ -1363,7 +1377,7 @@ function NegotiatePage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-8 -mt-6">
+      <div className="max-w-5xl mx-auto px-4 py-8 -mt-6 relative">
         {/* Progress Steps */}
         <div className="bg-white rounded-2xl shadow-lg p-4 mb-8">
           <div className="flex items-center justify-between">
@@ -1861,7 +1875,7 @@ function SubmitPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState({
     job_title: '', industry: '', years_experience: '', salary: '', location: '',
-    gender: '', ethnicity: '', education_level: '', company_size: '', remote_status: ''
+    gender: '', ethnicity: '', education_level: '', company_size: '', company_name: '', remote_status: ''
   })
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -2007,6 +2021,17 @@ function SubmitPage() {
               {['remote', 'hybrid', 'onsite'].map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className="label">Company Name <span className="text-secondary-400 font-normal">(Optional - for company-specific insights)</span></label>
+          <input
+            type="text"
+            value={form.company_name}
+            onChange={e => setForm({...form, company_name: e.target.value})}
+            className="input"
+            placeholder="e.g., Google, Microsoft, Startup Inc."
+          />
         </div>
 
         <div className="bg-secondary-50 p-4 rounded-xl text-sm text-secondary-600 border border-secondary-100">

@@ -498,13 +498,13 @@ def submit_salary():
     try:
         execute_query("""
             INSERT INTO salary_submissions
-            (id, job_title, industry, years_experience, salary, location, gender, ethnicity, education_level, company_size, remote_status, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP())
+            (id, job_title, industry, years_experience, salary, location, gender, ethnicity, education_level, company_size, company_name, remote_status, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP())
         """, [
             salary_id, data['job_title'], data['industry'],
             int(data['years_experience']), float(data['salary']), data['location'],
             data.get('gender'), data.get('ethnicity'), data.get('education_level'),
-            data.get('company_size'), data.get('remote_status')
+            data.get('company_size'), data.get('company_name'), data.get('remote_status')
         ], fetch=False)
 
         return jsonify({'message': 'Salary data submitted successfully', 'id': salary_id}), 201
@@ -716,6 +716,56 @@ def get_location_comparison():
         """)
 
         return jsonify({'locations': comparison})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/company-comparison', methods=['GET'])
+def get_company_comparison():
+    """Get salary analytics for specific companies (like Glassdoor)."""
+    company = request.args.get('company', '')
+
+    try:
+        if company:
+            # Get company-specific data
+            comparison = execute_query("""
+                SELECT
+                    company_name,
+                    COUNT(*) as sample_size,
+                    AVG(salary) as avg_salary,
+                    MEDIAN(salary) as median_salary,
+                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY salary) as p25,
+                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY salary) as p75,
+                    MIN(salary) as min_salary,
+                    MAX(salary) as max_salary
+                FROM salary_submissions
+                WHERE LOWER(company_name) LIKE LOWER(%s)
+                  AND company_name IS NOT NULL
+                  AND company_name != ''
+                GROUP BY company_name
+                HAVING COUNT(*) >= 2
+                ORDER BY sample_size DESC
+                LIMIT 10
+            """, [f'%{company}%'])
+        else:
+            # Get top companies by submission count
+            comparison = execute_query("""
+                SELECT
+                    company_name,
+                    COUNT(*) as sample_size,
+                    AVG(salary) as avg_salary,
+                    MEDIAN(salary) as median_salary,
+                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY salary) as p25,
+                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY salary) as p75
+                FROM salary_submissions
+                WHERE company_name IS NOT NULL
+                  AND company_name != ''
+                GROUP BY company_name
+                HAVING COUNT(*) >= 3
+                ORDER BY sample_size DESC
+                LIMIT 20
+            """)
+
+        return jsonify({'companies': comparison})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
